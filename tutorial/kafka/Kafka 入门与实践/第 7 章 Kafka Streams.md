@@ -447,3 +447,19 @@ kafka-console-producer.sh --broker-list localhost:9092 --topic right-table --pro
 6 Tue May 01 17:21:31 CST 2018
 [KTABLE-MERGE-0000000006]: K1 , ([C, null]<-null)
 ```
+
+### 7.3.4 变换操作
+
+```bash
+kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic word
+
+# 创建一个生产者（注意：先不要发送消息）
+kafka-console-producer.sh --broker-list 188.166.244.4:9092 --topic word
+>
+
+## 开始运行程序
+
+# 开始发送消息，观察程序的输出结果
+kafka-console-producer.sh --broker-list 188.166.244.4:9092 --topic word
+>
+```
