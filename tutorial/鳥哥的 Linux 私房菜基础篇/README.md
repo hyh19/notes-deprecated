@@ -1,0 +1,1 @@
+# [鳥哥的 Linux 私房菜基础篇](http://linux.vbird.org/linux_basic/)
