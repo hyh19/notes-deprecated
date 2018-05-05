@@ -13,7 +13,7 @@
 
 KStream 示例
 
-```java
+```java {.line-numbers}
 package $7_3_1;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
