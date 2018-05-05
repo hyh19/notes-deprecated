@@ -1,12 +1,17 @@
-[toc]
-
 # 第 7 章 Kafka Streams
+
+- [第 7 章 Kafka Streams](#7--kafka-streams)
+    - [7.3 Kafka Streams API 介绍](#73-kafka-streams-api)
+        - [7.3.1 KStream 与 KTable](#731-kstream--ktable)
+        - [7.3.3 连接操作](#733)
+            - [KStream 与 KStream连接](#kstream--kstream)
+            - [KTable 与 KTable 连接](#ktable--ktable)
 
 ## 7.3 Kafka Streams API 介绍
 
 ### 7.3.1 KStream 与 KTable
 
-**KStream 示例**
+KStream 示例
 
 ```java
 package $7_3_1;
@@ -169,11 +174,11 @@ $ kafka-console-producer.sh --broker-list 206.189.144.39:9092 --topic dog --prop
 ### 7.3.3 连接操作
 
 Kafka Streams 流连接与 SQL 表连接类比
-Kafka Streams | SQL
----|---
-join() | INNER JOIN
-leftJoin() | LEFT OUTER JOIN
-outerJoin() | LEFT OUTER JOIN + RIGHT OUTER JOIN
+| Kafka Streams | SQL                                |
+| ------------- | ---------------------------------- |
+| join()        | INNER JOIN                         |
+| leftJoin()    | LEFT OUTER JOIN                    |
+| outerJoin()   | LEFT OUTER JOIN + RIGHT OUTER JOIN |
 
 #### KStream 与 KStream连接
 
@@ -225,11 +230,11 @@ public class StreamJoinDemo {
 **join()**
 
 [预测结果](http://kafka.apache.org/11/javadoc/org/apache/kafka/streams/kstream/KStream.html#join-org.apache.kafka.streams.kstream.KStream-org.apache.kafka.streams.kstream.ValueJoiner-org.apache.kafka.streams.kstream.JoinWindows-)
-this | other | result
----|---|---
-<K1:A> | - | -
-<K2:B> | <K2:b> | <K2:ValueJoiner(B,b)>
-- | <K3:c> | -
+| this   | other  | result                |
+| ------ | ------ | --------------------- |
+| <K1:A> | -      | -                     |
+| <K2:B> | <K2:b> | <K2:ValueJoiner(B,b)> |
+| -      | <K3:c> | -                     |
 
 测试结果
 ```bash
@@ -253,11 +258,11 @@ kafka-console-producer.sh --broker-list localhost:9092 --topic right-stream --pr
 **leftJoin()**
 
 [预测结果](http://kafka.apache.org/11/javadoc/org/apache/kafka/streams/kstream/KStream.html#leftJoin-org.apache.kafka.streams.kstream.KStream-org.apache.kafka.streams.kstream.ValueJoiner-org.apache.kafka.streams.kstream.JoinWindows-)
-this | other | result
----|---|---
-<K1:A> | - | <K1:ValueJoiner(A,null)>
-<K2:B> | <K2:b> | <K2:ValueJoiner(B,b)>
-- | <K3:c> | -
+| this   | other  | result                   |
+| ------ | ------ | ------------------------ |
+| <K1:A> | -      | <K1:ValueJoiner(A,null)> |
+| <K2:B> | <K2:b> | <K2:ValueJoiner(B,b)>    |
+| -      | <K3:c> | -                        |
 
 测试结果
 ```bash
@@ -287,11 +292,11 @@ kafka-console-producer.sh --broker-list localhost:9092 --topic left-stream --pro
 **outerJoin()**
 
 [预测结果](http://kafka.apache.org/11/javadoc/org/apache/kafka/streams/kstream/KStream.html#outerJoin-org.apache.kafka.streams.kstream.KStream-org.apache.kafka.streams.kstream.ValueJoiner-org.apache.kafka.streams.kstream.JoinWindows-)
-this | other | result
----|---|---
-<K1:A> | - | <K1:ValueJoiner(A,null)>
-<K2:B> | <K2:b> | <K2:ValueJoiner(null,b)>, <K2:ValueJoiner(B,b)>
-- | <K3:c> | <K3:ValueJoiner(null,c)>
+| this   | other  | result                                          |
+| ------ | ------ | ----------------------------------------------- |
+| <K1:A> | -      | <K1:ValueJoiner(A,null)>                        |
+| <K2:B> | <K2:b> | <K2:ValueJoiner(null,b)>, <K2:ValueJoiner(B,b)> |
+| -      | <K3:c> | <K3:ValueJoiner(null,c)>                        |
 
 测试结果
 ```bash
@@ -385,12 +390,12 @@ public class TableJoinDemo {
 ```
 
 [预测结果](http://kafka.apache.org/11/javadoc/org/apache/kafka/streams/kstream/KTable.html#join-org.apache.kafka.streams.kstream.KTable-org.apache.kafka.streams.kstream.ValueJoiner-org.apache.kafka.streams.kstream.Materialized-)
-thisKTable | thisState | otherKTable | otherState | result updated record
----|---|---|---|---
-<K1:A> | <K1:A> | - | - | -
-- | <K1:A> | <K1:b> | <K1:b> | <K1:ValueJoiner(A,b)>
-<K1:C> | <K1:C> | -| <K1:b> | <K1:ValueJoiner(C,b)>
-- | <K1:C> | <K1:null> | - | <K1:null>
+| thisKTable | thisState | otherKTable | otherState | result updated record |
+| ---------- | --------- | ----------- | ---------- | --------------------- |
+| <K1:A>     | <K1:A>    | -           | -          | -                     |
+| -          | <K1:A>    | <K1:b>      | <K1:b>     | <K1:ValueJoiner(A,b)> |
+| <K1:C>     | <K1:C>    | -           | <K1:b>     | <K1:ValueJoiner(C,b)> |
+| -          | <K1:C>    | <K1:null>   | -          | <K1:null>             |
 
 测试结果
 ```bash
