@@ -1,0 +1,1602 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0008_split_006.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0008_split_008.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_129" class="sigil_not_in_toc">5.7　连接器基本操作</h2>
+
+  <p class="zw">Kafka自带了对连接器应用的脚本，用于将数据从外部系统导入到Kafka或从Kafka中导出到外部系统。Kafka连接器有<strong class="calibre1">独立模式</strong>（standalone）和<strong class="calibre1">分布式模式</strong>（distributed）两种工作模式。Kafka自带脚本connect-standalone.sh和connect-distributed.sh分别对应Kafka连接器的两种工作模式。本节将根据Kafka提供的连接器执行脚本分别介绍在这两种工作模式下Kafka与外部系统之间数据交互的操作。</p>
+
+  <h3 id="nav_point_130" class="calibre9">5.7.1　独立模式</h3>
+
+  <p class="zw">Kafka自带脚本connect-standalone.sh用于以独立模式启动Kafka连接器。本小节详细介绍如何通过该脚本将文件中的数据导入到Kafka以及将Kafka中的数据导出到文件。</p>
+
+  <p class="zw">执行该脚本时需要指定两个配置文件，一个是worker运行时相关配置的配置文件，称为WorkConfig，在该文件中指定与Kafka建立连接的配置（bootstrap.servers）、数据格式转化类（key.converter/value.converter）、保存偏移量的文件路径（offset.storage.file.filename）、提交偏移量的频率（offset.flush.interval.ms）等。另外一个是指定source连接器或是sink连接器配置的文件，可同时指定多个连接器配置，每个连接器配置文件对应一个连接器，因此要保证连接器名称全局唯一，连接器名通过name属性指定。</p>
+
+  <h4 class="sigil_not_in_toc1">1．Source连接器</h4>
+
+  <p class="zw">Source连接器用于将外部数据导入到Kafka相应主题中。Kafka自带的connect-file- source.properties文件配置了一个读取文件的Source连接器，修改该配置文件内容如代码清单5-7所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-7　connect-file-source.properties文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">name=local-file-source
+connector.class=FileStreamSource
+tasks.max=1
+file=/tmp/kafka-action/connect/input/test.txt
+topic=connect-test</code></pre>
+
+  <p class="zw">该连接器运行一个task，按行将/tmp/kafka-action/streams/input/test.txt文件中的数据导入到一个名为“connect-test”的主题中。该配置文件各配置说明如表5-7所示。</p>
+
+  <p class="biao_ti">表5-7　Source连接器配置说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属　性　名</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属 性 描 述</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">name</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">连接器名称</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">connector.class</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Source连接器执行类，该类继承org.apache.kafka.connect.source.SourceConnector类</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">tasks.max</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">SourceTask数量</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">file</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">该连接器数据源文件路径</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">topic</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">数据导入的目标主题名称</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">在启动连接器前，先在/tmp/kafka-action/connect/input目录下创建一个test.txt文件，然后执行以下命令启动一个从文件导入数据到Kafka的连接器：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">connect-standalone.sh  ../config/connect-standalone.properties  ../config/connect
+-file-source.properties</code></pre>
+
+  <p class="zw">该命令支持daemon参数，以daemon方式启动的命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">connect-standalone.sh -daemon ../config/connect-standalone.properties ../ 
+config/connect-file-source.properties</code></pre>
+
+  <p class="zw">连接器启动后会在logs目录下创建一个connectStandalone.out日志文件，该日志文件记录了连接器运行时相关的日志。连接器启动完成后，向test.txt文件中写入数据：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">echo " kafka-connect " &gt;&gt; /tmp/kafka-action/connect/input/test.txt</code></pre>
+
+  <p class="zw">登录ZooKeeper客户端，查看主题元数据信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 43] ls 
+/brokers/topics/connect-test/partitions 
+[0]
+[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 44] get 
+/brokers/topics/connect-test/partitions/0/state
+{"controller_epoch":26,"leader":2,"version":1,"leader_epoch":0,"isr":[2]}</code></pre>
+
+  <p class="zw">由主题元数据信息可知，当启动一个Source连接器后，发送消息时会通过生产者创建主题的方式创建一个Source连接器启动时指定的主题（若该主题不存在），该主题拥有一个分区。该分区被分配到brokerId为2的节点上，在该节点执行以下命令，查看分区中导入的数据：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-run-class.sh kafka.tools.DumpLogSegments --files 
+/opt/data/kafka-logs/connect-test-0/00000000000000000000.log  --print-data-log</code></pre>
+
+  <p class="zw">该命令执行后输出结果：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">offset: 0 position: 0 CreateTime: 1490848047199 isvalid: true payloadsize: 71 magic: 
+1 compresscodec: NoCompressionCodec crc: 2697874837 keysize: 30 key: 
+{"schema":null,"payload":null} payload: 
+{"schema":{"type":"string","optional":false},"payload":"kafka-connect"}</code></pre>
+
+  <p class="zw">从输出结果可以看到通过echo指令写入到文件中的信息被成功导入到Kafka中，该信息在Kafka中对应的消息格式为JSON字符串且带有schema信息，这是由于在connect-standalone. properties文件中设置了消息的Key和Value的转换类为org.apache.kafka.connect.json.Json Converter，同时设置了key.converter.schemas.enable和value.converter.schemas.enable两配置项的值为true。</p>
+
+  <p class="zw">Source连接器是通过多个SourceTask共享一个KafkaProducer将数据发送到Kafka，因此在Source连接器启动时，在启动日志中会看到加载ProduceConfig相关的配置信息。我们可以在WorkConfig中指定生产者级别的配置，即在connect-standalone.properties文件中通过“producer.”前缀来指定生产者级别的配置。</p>
+
+  <h4 class="sigil_not_in_toc1">2．Sink连接器</h4>
+
+  <p class="zw">Kafka自带脚本connect-console-sink.properties配置了一个将Kafka中的数据导出到文件的Sink连接器，这里将该配置文件稍微进行修改，指定数据导出路径为/tmp/kafka-action/connect/ output/test.txt。各Sink连接器的配置说明如表5-8所示。</p>
+
+  <p class="biao_ti">表5-8　Sink连接器配置说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属　性　名</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属 性 描 述</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">name</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">连接器名称</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">connector.class</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Sink连接器执行类，该类继承org.apache.kafka.connect.sink.SinkConnector类</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">tasks.max</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">SinkTask数量</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">file</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">数据导出后输出的目标文件路径</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">topics</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">导出数据源对应的主题名称，可指定多个主题</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">执行以下命令，启动Sink连接器，将上一小节导入到Kafka的数据导出到/tmp/kafka-action/ connect/output/test.txt文件中：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">connect-standalone.sh  ../config/connect-standalone.properties  ../config/connect
+-file-sink.properties</code></pre>
+
+  <p class="zw">Sink连接器是通过KafkaConsumer从指定的主题中消费消息，在Sink连接器启动日志中会看到加载ConsumerConfig的配置信息。在启动Sink连接器时可以在WorkConfig配置文件中以“consumer.”为前缀来指定Consumer级别的配置。本小节介绍的FileStreamSink连接器，默认情况下是以Sink连接器名作为group.id的，且不同的连接要求名称全局唯一，也就是说，默认情况下不同的连接器属于不同的消费组。</p>
+
+  <p class="zw">可以同时启动多个Sink连接器。将connect-file-sink.properties文件复制一份命名为connect-file-sink-2.properties，同时修改该文件内容如代码清单5-8所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-8　connect-file-sink-2.properties文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">name=local-file-sink-2
+connector.class=FileStreamSink
+tasks.max=1
+file=/tmp/kafka-action/connect/output/test2.txt
+topics=connect-test</code></pre>
+
+  <p class="zw">执行以下命令，同时启动两个Sink连接器：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">connect-standalone.sh ../config/connect-standalone.properties ../config/connect-
+file-sink.properties ../config/connect-file-sink-2.properties</code></pre>
+
+  <p class="zw">连接器启动成功后，打开两个Sink连接器对应的目标文件可以看到两个文件内容相同，这是由于这两个连接器属于两个不同的消费组，因此同一条消息会被这两个连接器同时消费。</p>
+
+  <h3 id="nav_point_131" class="calibre9">5.7.2　REST风格API应用</h3>
+
+  <p class="zw">Kafka提供了一套基于REST风格API接口来管理连接器，默认端口为8083，也可以在启动Kafka连接器前在WorkConfig配置文件中通过rest.port配置端口。相关的REST风格接口在Kafka connect源码runtime工程的org.apache.kafka.connect.runtime.rest.resources包下定义。相关的REST风格接口说明如表5-9所示。</p>
+
+  <p class="biao_ti">表5-9　Kafka连接器管理REST风格接口说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">接口url</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">访问方式</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">接 口 说 明</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看Kafka版本信息</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看当前活跃的连接器列表，显示连接器的名字</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">POST</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">根据指定配置，创建一个新连接器</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看指定连接器的信息</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/config</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看指定连接器的配置信息</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/config</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">PUT</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">修改指定连接器的配置</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/status</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看指定连接器的状态</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/restart</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">POST</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">重启指定连接器</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/pause</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">PUT</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">暂停指定的连接器</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/resume</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">PUT</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">恢复所指定的被暂停的连接器</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/tasks</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看指定连接器正在运行的Task</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/tasks</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">POST</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">修改Task配置，即覆盖现有Task，只支持分布模式</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/tasks/{task}/status</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看某个连接器的某个Task的状态</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}/tasks/{task}/restart</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">POST</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">重启某个连接器的某个Task</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connectors/{connector}</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">DELETE</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">删除指定连接器</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connector-plugins</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">GET</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">查看已配置的连接器，显示连接器实例类完整路径</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/connector-plugins /{connectorType}/config/validate</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">PUT</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">验证指定的配置，返回各配置</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">表5-9中，{connector}指待查看的连接器名，即连接器配置文件name字段指定的值，{task}指待查看的Task的taskId，{connectorType}指连接器配置文件中connector.class指定的值。</p>
+
+  <p class="zw">对表5-9中列举的连接器的相关操作，不再逐个进行操作讲解，这里着重讲解如何通过模拟HTTP请求工具Postman访问Kafka连接器的REST风格接口修改一个连接器的配置。</p>
+
+  <p class="zw">首先启动Kafka自带的FileStreamSource连接器，然后向该连接器指定的数据源文件通过echo指令写一条数据：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">echo "restful test" &gt;&gt; /tmp/kafka-action/connect/input/test.txt</code></pre>
+
+  <p class="zw">此时分区中数据内容如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">offset: 0 position: 0 CreateTime: 1490962508781 isvalid: true payloadsize: 70 magic: 
+1 compresscodec: NoCompressionCodec crc: 2046084259 keysize: 30 key: 
+{"schema":null,"payload":null} payload: 
+{"schema":{"type":"string","optional":false},"payload":"restful test"}</code></pre>
+
+  <p class="zw">可以看到当前消息是以JSON字符串的形式存储的，现在通过REST风格接口修改数据转换类为org.apache.kafka.connect.storage.StringConverter。</p>
+
+  <p class="zw">首先，设置HTTP请求方式为POST，同时设置HTTP的header信息，在Postman的Headers界面配置以下HTTP头信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Content-Type: application/json
+User-Agent: kafka-connect
+Accept: application/json</code></pre>
+
+  <p class="zw">在HTTP请求工具Postman的Headers子菜单中配置HTTP请求头如图5-12所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00100.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-12　Headers信息设置</p>
+
+  <p class="zw">然后，在Postman的Body界面中以JSON格式设置需要修改的配置信息，如代码清单5-9所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-9　修改消息导入的数据格式的具体设置</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{
+   "connector.class":"FileStreamSource",
+   "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+   "value.converter":"org.apache.kafka.connect.storage.StringConverter",
+   "converter.internal.key.converter":"org.apache.kafka.connect.storage.StringConverter",
+   "converter.internal.value.converter":"org.apache.kafka.connect.storage.StringConverter",
+   "topic": "connect-test",
+   "file":"/tmp/kafka-action/connect/input/test.txt"
+}</code></pre>
+
+  <p class="zw">设置消息的Key和Value的转换类为org.apache.kafka.connect.storage.StringConverter，通过连接器修改配置时配置项connnector.class和topic配置项必须指定，若不指定虽然请求能够成功，但所进行的修改并不会生效，在连接器运行日志中会有相应的异常提示信息。同时，修改配置时配置项file也需指定，否则该连接器修改后的配置会由于没有指定从哪个数据源文件中读取数据，而导致即使向原指定的数据源文件中通过echo指定写入数据，Kafka也将接收不到任何消息。由此可知，其实每次的修改都是根据相应配置新创建一个连接器实例。</p>
+
+  <p class="zw">在Postman中通过访问REST风格接口修改连接器配置的完整设置如图5-13所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00101.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-13　Postman请求修改连接器配置的具体设置</p>
+
+  <p class="zw">修改连接器配置的请求执行后，会返回连接器当前的配置信息，如图5-14所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00102.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-14　修改连接器配置请求响应结果</p>
+
+  <p class="zw">然后再通过echo指令向数据源文件中写入一条数据，由于元数据在间隔一定时间后才更新，因此可能修改的配置并没有立即生效，可以重新启动该连接器的Task使当前连接器所进行的修改立即生效。在Postman中通过访问REST风格接口重启Task操作如图5-15所示，只需在请求的url地址中指定需要重启的taskId，并指定操作指令为“restart”即可。</p>
+
+  <p class="tu"><img alt="" src="../images/00103.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-15　重启连接器Task操作请求设置</p>
+
+  <p class="zw">由于是重启操作，所以该接口调用并不会返回操作响应结果。通过查看连接器运行日志可看到该接口返回应答信息如图5-16所示，即表示Task重启成功。</p>
+
+  <p class="tu"><img alt="" src="../images/00104.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-16　Task成功启动相应日志信息</p>
+
+  <p class="zw">重启Task之后，再次执行echo指令将写入的数据通过StringConverter类转化为普通文本消息。配置修改前后分区中的信息对比如图5-17所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00105.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-17　连接器数据格式修改前后的数据对比</p>
+
+  <h3 id="nav_point_132" class="calibre9">5.7.3　分布式模式</h3>
+
+  <p class="zw">Kafka自带的connect-distributed.sh脚本用于以分布式模式运行连接器，执行该脚本时需要指定一个WorkConfig类型的配置文件，但以分布式模式启动连接器并不支持在启动时通过加载连接器配置文件创建一个连接器，而只能通过访问REST风格接口创建连接器。</p>
+
+  <p class="zw">以分布式模式启动连接器时，通常需要关注如表5-10所示的配置项。</p>
+
+  <p class="biao_ti">表5-10　分布式模式连接器配置说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属　性　名</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">属 性 描 述</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">group.id</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">连接器Cluster的唯一标识</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">bootstrap.servers</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">与Kafka代理建立连接的配置</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">config.storage.topic</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">用于存储连接器相关配置信息的主题，包括创建连接的配置信息以及该连接的Task信息。要指定该主题拥有一个分区和多个副本，需要手动创建</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">offset.storage.topic</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">用于存储Source连接器读取数据对应偏移量的主题，与存储消费者提交偏移量的内部主题作用相同。该主题通常有多个分区和多个副本，若Kafka启动时指定auto.create.topics.enable=true，则根据默认分区及副本数自动创建该主题，因此建议该主题也通过手动创建</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">status.storage.topic</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">用于存储连接器每个Task状态的主题，该主题通常也有多个分区和多个副本，也需要手动创建</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">session.timeout.ms</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">用于设置连接器的Work与WorkCoordinator之间的最大超时时间，Work会周期性地向WorkCoordinator发送心跳，让WorkCoordinator以此来判断Work是否有效，若在该配置时间内还未收到Work发送的心跳则WorkCoordinator会将该Work从工作组中移除，同时触发WorkCoordinator进行平衡操作</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">offset.flush.interval.ms</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">连接器Task提交偏移量的时间间隔</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">heartbeat.interval.ms</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">连接器Work向WorkCoordinator发送心跳检测的间隔时间，推荐该值不超过session.timeout.ms的1/3</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">在对连接器分布式模式运行的配置了解之后，按以下步骤运行Kafka自带的FileStream Source连接器和FileStreamSink连接器。</p>
+
+  <p class="zw">（1）<strong class="calibre1">修改WorkConfig配置文件</strong>。修改${KAFKA_HOME}/config目录下的connect- distributed.properties文件，这里仅进行以下修改：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">bootstrap.servers=server-1:9092,server-2:9092,server-3:9092</code></pre>
+
+  <p class="zw">（2）<strong class="calibre1">创建相关主题</strong>。依次创建connect-distributed.properties文件中配置的3个主题。</p>
+
+  <p class="zw">（a）创建保存偏移量的主题，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--replication-factor 2 --partitions 3 --topic connect-offsets</code></pre>
+
+  <p class="zw">（b）创建保存连接器配置的主题，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--replication-factor 2 --partitions 1 --topic connect-configs</code></pre>
+
+  <p class="zw">（c）创建保存Task状态的主题，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--replication-factor 2 --partitions 3 --topic connect-status</code></pre>
+
+  <p class="zw">（3）<strong class="calibre1">分布式模式启动</strong>。执行connect-distributed.sh脚本，以分布式模式启动连接器，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">connect-distributed.sh  ../config/connect-distributed.properties</code></pre>
+
+  <p class="zw">启动日志输出中会有几行警告信息，提示所提供的某个配置项是未知配置：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">WARN The configuration 'config.storage.topic' was supplied but isn't a known config</code></pre>
+
+  <p class="zw">这是由于在连接器启动时会加载ProducerConfig和ConsumerConfig，而对ProducerConfig和ConssumerConfig初始化时会将WorkConfig中的所有配置加入到这两类配置对应的Map中，由于Work中的部分配置并不是ProducerConfig或ConsuermConfig中定义的配置项，因此在解析配置项时会给出警告信息。同样支持设置以“producer.”作为配置项前缀的生产者级别的配置和以“consumer.”作为配置项前缀的消费者级别的配置。</p>
+
+  <p class="zw">（4）<strong class="calibre1">创建一个FileStreamSource连接器</strong>。首先，在/tmp/kafka-action/connect/input目录下创建一个名为connect-distributed.txt文件，然后编辑创建FileStreamSource连接器的相关配置，配置内容如代码清单5-10所示。我们指定该连接器将/tmp/kafka-action/connect/input/connect- distributed.txt文件中的数据导入一个名为“connect-distributed”的主题中，数据转化类为org.apache.kafka.connect.storage.StringConverter。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-10　分式式模式请求创建FileStreamSource连接器的相关配置</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{
+   "name": "local-file-distribute-source", 
+   "config": {
+       "topic": "connect-distributed",
+       "connector.class": "FileStreamSource",
+       "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+       "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+       "converter.internal.key.converter": "org.apache.kafka.connect.storage. 
+       StringConverter",
+       "converter.internal.value.converter": "org.apache.kafka.connect.storage. 
+       StringConverter",
+       "file": "/tmp/kafka-action/connect/input/connect-distributed.txt"
+   }
+}</code></pre>
+
+  <p class="zw">通过访问REST风格接口创建连接器。在Postman中首先设置HTTP请求头信息（设置与5.7.2节所介绍的配置相同），然后在消息体中加入代码清单5-10对应的连接器配置信息，并指定请求方式为POST，在Postman中的设置如图5-18所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00106.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-18　访问REST风格接口请求创建Source连接器的相关设置</p>
+
+  <p class="zw">待创建连接器的请求成功返回后，通过REST风格接口查看该连接器的信息。在Postman中访问REST风格接口请求查看该连接器的信息设置及响应结果如图5-19所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00107.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-19　REST风格接口请求查看该连接器的信息设置及响应结果</p>
+
+  <p class="zw">然后，向connect-distributed.txt发送数据，验证FileStreamSource连接器是否正常运行。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">echo "connect-distributed" &gt;&gt; /tmp/kafka-action/connect/input/connect-distributed.txt</code></pre>
+
+  <p class="zw">此时，登录ZooKeeper客户端，查看目标主题“connect-distributed”是否被创建以及该主题分区对应的节点信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk:server-1:2181,server-2:2181,server-3:2181(CONNECTED)38]get /brokers/topics/ 
+connect-distributed/partitions/0/state
+{"controller_epoch":31,"leader":2,"version":1,"leader_epoch":0,"isr":[2]}</code></pre>
+
+  <p class="zw">登录分区对应的节点，查看导入的数据，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-run-class.sh kafka.tools.DumpLogSegments --files /opt/data/kafka-logs/ 
+connect-distributed-0/00000000000000000000.log --print-data-log</code></pre>
+
+  <p class="zw">输出结果为：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Starting offset: 0
+offset: 0 position: 0 CreateTime: 1491039692562 isvalid: true payloadsize: 19 magic: 1 compresscodec: NoCompressionCodec crc: 1188385350 payload: connect-distribute</code></pre>
+
+  <p class="zw">至此，FileStreamSource连接器已正常运行。</p>
+
+  <p class="zw">（5）<strong class="calibre1">创建一个FileStreamSink连接器</strong>。通过REST风格接口创建一个FileStreamSink连接将第4步导入的数据导出到connect-distributed-sink.txt文件中。创建该连接器的配置如代码清单5-11所示，对应的connector.class为FileStreamSink，通过topics参数指定数据源主题。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-11　实例化FileStreamSink连接器的具体配置</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{
+   "name": "local-file-distribute-sink",
+   "config": {
+     "topics": "connect-distributed",
+     "connector.class": "FileStreamSink",
+     "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+     "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+     "converter.internal.key.converter": "org.apache.kafka.connect.storage. 
+     StringConverter",
+     "converter.internal.value.converter": "org.apache.kafka.connect.storage.
+     StringConverter",
+     "file": "/tmp/kafka-action/connect/output/connect-distributed-sink.txt"
+   }
+}</code></pre>
+
+  <p class="zw">将该FileStreamSink连接器配置信息在Postman中执行后，查看当前活跃的连接器信息如图5-20所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00108.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-20　访问REST风格接口请求查看当前连接器的操作及响应结果</p>
+
+  <p class="zw">在/tmp/kafka-action/connect/out/目录下会自动创建一个connect-distributed-sink.txt文件，打开该文件，可以看到导入到Kafka中的数据已被成功导出，如图5-21所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00109.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-21　分布式模式创建的Sink连接器导出数据效果</p>
+
+  <p class="zw">至此，连接器分布式模式基本操作已介绍完毕。关于连接器的其他操作，如多任务运行、REST风格访问跨域设置、安全组件验证等，在这里不再展开介绍。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0008_split_006.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0008_split_008.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

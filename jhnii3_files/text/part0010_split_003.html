@@ -1,0 +1,1153 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0010_split_002.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0010_split_004.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_169" class="sigil_not_in_toc">7.3　Kafka Streams API介绍</h2>
+
+  <p class="zw">本节简单介绍Kafka Streams的部分API应用。为此，首先引入Kafka Streams的依赖包，在pom.xml文件中加入Kafka Streams的依赖。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">&lt;dependency&gt;
+  &lt;groupId&gt;org.apache.kafka&lt;/groupId&gt;
+  &lt;artifactId&gt;kafka-streams&lt;/artifactId&gt;
+  &lt;version&gt;0.10.1.1&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+  <h3 id="nav_point_170" class="calibre9">7.3.1　KStream与KTable</h3>
+
+  <p class="zw">Kafka Streams为高层流定义了KStream和KTable两种抽象。KTable是一个日志更新流，即相同Key数据集是进行更新操作，同一个Key总是保留最新的值；KStream是一个记录流，每条数据集都是一个独立的数据单元。下面分别定义一个日志流和一个日志更新流，通过输出这两个流处理结果来看两者在数据处理上的区别。</p>
+
+  <p class="zw">在介绍具体实现之前，我们先通过Kafka shell创建一个主题，创建主题命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 --create --topic streams-foo --partitions 1 --replication-factor 1</code></pre>
+
+  <p class="zw">Kafka Streams提供了一个KStreamBuilder类用于使用流DSL构建处理器拓扑，该类继承TopologyBuilder。然后通过KStreamBuilder类的stream()方法和table()方法分别创建一个KStream和KTable对象。</p>
+
+  <p class="zw">以Kafka主题streams-foo作为数据源创建一个KStream记录流，并通过print()方法将数据集输出到控制台。Kafka Streams提供了对处理结果多种处理方式，例如，通过print()方法输出到控制台，通过to()方法写入到一个Kafka主题，通过writeAsText()方法写入到文件。实现逻辑如代码清单7-1所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-1　创建KStream日志流并输出数据集到控制台的代码片段</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">// 构造实例化KafkaStreams对象的配置
+Properties props = new Properties();
+// 指定流处理应用的id，该配置必须指定
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, "KStream-test");
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+// Key序列化与反序化类
+props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+// Value序列化与反序化类
+props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+KStreamBuilder builder = new KStreamBuilder();
+// 构造KStream日志流
+KStream&lt;String, String&gt; textLine= builder.stream("streams-foo"); 
+// 输入日志流中数据
+textLine.print();
+KafkaStreams streams = new KafkaStreams(builder, props);
+streams.start();
+// 让线程休眠5秒
+Thread.sleep(5000L);
+streams.close();</code></pre>
+
+  <p class="zw">通过Kafka shell为“streams-foo”主题发送几条消息，启动生产者的命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-producer.sh --broker-list server-1:9092,server-2:9092,server-3:9092 --topic streams-foo --property parse.key=true --property key.separator=" "</code></pre>
+
+  <p class="zw">该生产者指定消息Key和Value之间以空格分隔，在控制台输入以下信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">jetty shanghai
+jetty beijing
+jetty Hangzhou</code></pre>
+
+  <p class="zw">运行KStream程序后，在控制台输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[KSTREAM-SOURCE-0000000000]: jetty , shanghai
+[KSTREAM-SOURCE-0000000000]: jetty , beijing
+[KSTREAM-SOURCE-0000000000]: jetty , hangzhou</code></pre>
+
+  <p class="zw">由KStream程序输出信息可知，每条数据集在日志流中都是一个独立的键值对。下面将代码构建KStream日志流这行代码修改为：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KTable&lt;String, String&gt; textLine = builder.table("streams-foo","KTable-test");
+// 构造一个KTable更新流</code></pre>
+
+  <p class="zw">再次启动并运行该程序，在控制台输入信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[KTABLE-SOURCE-0000000001]: jetty , (hangzhou&lt;-null)</code></pre>
+
+  <p class="zw">从输出信息可以看出，数据集经由KTable更新日志流后，相同key只会保留最新的一个值。以上数据集经由KStream和KTable处理的过程描述如图7-6所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00128.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图7-6　KStream和KTable对数据集进行处理的过程</p>
+
+  <p class="zw">同时，KTable与KStream可以相互转换，例如，KTable通过toStream()方法可以转为KStream。而KStream通过变换处理先转为KGroupedStream，然后由KGroupedStream转为KTable。</p>
+
+  <h3 id="nav_point_171" class="calibre9">7.3.2　窗口操作</h3>
+
+  <p class="zw">流式处理有时可能需要将数据划分成多个时间段，以时间窗口滑动的形式处理，即通常所说的流上的窗口操作。窗口操作一般在连接和聚合等保存本地状态的程序中使用。</p>
+
+  <p class="zw">在Kafka Streams应用中，我们说窗口操作主要是指KStream之间连接操作的JoinWindows以及聚合操作中使用的TimeWindows，这两个窗口都集成Windows类。通过指定窗口大小，将窗口内的数据集经过连接或聚合操作存储到状态仓库中</p>
+
+  <p class="zw">例如，指定KStream连接操作连接窗口为5min，可定义为：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">JoinWindows.of(TimeUnit.MINUTES.toMillis(5));</code></pre>
+
+  <p class="zw">JoinWindows除继承父类的属性和方法外，自定义了before和after两个属性，分别表示join操作取在之前最大时间及之后最大时间跨度的数据集。若调用的是JoinWindows.of(long timeDifference)方法，则before=after=timeDifference；若调用的是JoinWindows.before(long timeDifference)方法，则before=timeDifference，after=0；若调用的是JoinWindows.after(long timeDifference)方法，则before=0，after=timeDifference。</p>
+
+  <p class="zw">时间窗口一般在聚合操作中使用，在7.2节介绍过时间窗口有3种，而滑动窗口即是KStream连接操作使用的JoinWindows，这里说的时间窗口是指由TimeWindows类定义窗口，主要指跳跃窗口和翻转窗口，两者的区别在于翻转窗口的滑动步长与窗口大小相等，这样一条数据只属于一个窗口。</p>
+
+  <p class="zw">通过TimeWindows.of(windowSizeMs).advanceBy(intervalMs)定义一个用于聚合操作的时间窗口，如在KGroupedStream类的count()操作时需要指定时间窗口，当windowSizeMs=intervalMs时即表示是翻转窗口，当windowSizeMs&gt;intervalMs时表示是跳跃窗口。至于该定义是跳跃窗口还是翻转窗口则取决了应用场景。</p>
+
+  <h3 id="nav_point_172" class="calibre9">7.3.3　连接操作</h3>
+
+  <p class="zw">连接操作是通过键将两个流的记录进行合并，并生成新的流。Kafka Streams将流抽象为KStream和KTable两种类型，因此连接操作也是这两类流之间的操作。即KStream与KStream、KTable与KTable、KStream与KTable之间的连接。而KStream之间的连接操作往往是基于窗口的，否则每次所有数据都需再保存，这样记录就会无限增长。</p>
+
+  <p class="zw">连接操作要保证执行连接操作的KStrams或KTable数据源的分区数相同，同时生产者生产消息时分区分配策略相同，这样才能保证相同的键的消息分布在两个主题对应的分区相同。</p>
+
+  <p class="zw">Kafka Streams提供了内连接、左连接和外连接3种连接操作，分别对应join()方法、leftJoin()方法和outerJoin()方法。这3种连接操作与传统关系数据库的连接操作类似，因此对连接操作结果不进行深入介绍。下面简单介绍KStream与KTable之间的组合连接操作API的调用。</p>
+
+  <h4 class="sigil_not_in_toc1">1．KStream与KStream连接</h4>
+
+  <p class="zw">KStream之间的连接是基于时间窗口的，这从KStream的join()方法的参数就能体现出来，之所以是基于时间窗口，这是由于KStream中每一个记录流，若不集于时间窗口操作数据量达到一定程度时join操作的是一件很可怕的事，而且也是没有必要的。假设我们定义两个KStream，两个KStream之间的连接操作的示例实现如代码清单7-2所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-2　KStream之间的连接操作的简单样例代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">final Serde&lt;String&gt; stringSerde = Serdes.String();
+KStreamBuilder builder = new KStreamBuilder();
+KStream&lt;String, String&gt; leftStream = builder.stream(stringSerde, stringSerde, 
+"left-source");
+KStream&lt;String, String&gt; rightSteam = builder.stream(stringSerde, stringSerde, 
+"right-source");
+KStream&lt;String, String&gt; joinedStream = leftStream.join(rightSteam,
+ new ValueJoiner&lt;String, String, String&gt;() {
+     @Override
+     public String apply(String leftValue, String rightValue) {
+         return "left:" + leftValue + ", right:" + rightValue;
+     }
+}, JoinWindows.of(TimeUnit.MINUTES.toMillis(5)),// 指定时间窗口为5 min
+Serdes.String(), Serdes.String(), Serdes.String());</code></pre>
+
+  <p class="zw">代码清单7-2表示两个KStream进行内连接操作，指定时间窗口为5min。连接操作执行两个流值的合并是在ValueJoiner的apply()方法中完成的。这样无论是leftStream还是rightStream有新数据集到达时都会触发join操作（这里直接借用代码清单7-2中定义的变量名leftStream和rightStream来描述join操作的两个KStream）。例如，当leftStream收到一条消息时，就会从rightStream的本地状态仓库中取最近5min内数据执行join操作。如果将leftStream和rightStream看成数据库的两张表，当leftStream收到一条消息时，触发join操作逻辑类比SQL语句的话，对应的SQL语句如代码清单7-3所示；当righStream收到一条消息执行原理同leftStream。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-3　leftStream收到一条数据集与rightStream执行join操作类SQL语句</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">SELECT *
+FROM leftStream as lf
+INNER JOIN leftStream as rt
+ON lf.key = rt.key AND rt.timestamp+timewindow &gt;=lf.timestamp  AND lf.timestamp = ${新
+数据的时间戳}</code></pre>
+
+  <p class="zw">在代码清单7-3所示的SQL语句中，timewindow即指我们设置的JoinWindows。JoinWindows继承Windows类，实质也是一种TimeWindow。代码清单7-3所示的SQL语句仅是从单侧来表达join操作某个时间点的执行状态，对于join操作我们可用代码清单7-4所示的通用SQL来描述。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-4　join操作类SQL语句表述</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">SELECT *
+FROM stream1, stream2
+WHERE stream1.key = stream2.key AND stream1.ts - before &lt;= stream2.ts AND stream2.ts 
+&lt;= stream1.ts + after</code></pre>
+
+  <p class="zw">对于join操作左连接和外连接实现步骤与代码清单7-2类似，只需修改连接方式这行代码为相应的连接方式。</p>
+
+  <h4 class="sigil_not_in_toc1">2．KTable与KTable连接</h4>
+
+  <p class="zw">由于KTable是一个更新日志流，相同Key的记录只会保存最新的值，也就是说，对同一个Key而言无论何时都只会有一条最新记录，因此KTable连接操作无需时间窗口。一个简单KTable之间的内连接操作的核心逻辑如代码清单7-5所示。左连接及外连接在代码实现上仅是方法调用的区别，不再一一介绍。在ValueJoiner的apply()方法中对两个KTable数据集的值进行处理，这里依然是简单拼接成字符串。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-5　KTable之间操作的简单样例代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">final Serde&lt;String&gt; stringSerde = Serdes.String();
+KStreamBuilder builder = new KStreamBuilder();
+KTable&lt;String, String&gt; leftTable = builder.table(stringSerde, stringSerde, "left-source", 
+"ktable-join-left");
+KTable&lt;String, String&gt; rightTable = builder.table(stringSerde, stringSerde, "right- 
+source","ktable-join-right");
+KTable&lt;String, String&gt; joinedTable = leftTable.join(rightTable,new ValueJoiner&lt;String, 
+String, String&gt;() {
+    @Override
+    public String apply(String leftValue, String rightValue) {
+        return "left:" + leftValue + ", right:" + rightValue;
+    }
+});</code></pre>
+
+  <h4 class="sigil_not_in_toc1">3．KStream与KTable连接</h4>
+
+  <p class="zw">当前版本的Kafka Streams只支持KStream与KTable进行左连接，并不支持内连接及外连接。同时也只支持KStream左连接KTable，而支持KTable连接KStream。KStream与KTable左连接得到一个KStream，左连接操作右边连接数据的变化并不会触发join操作。当右边连接为KTable时，右边数据的变化仅是更新右边数据流。KStream与KTable左连接的实例代码如代码清单7-6所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-6　KStream与KTable左连接的实例代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">final Serde&lt;String&gt; stringSerde = Serdes.String();
+KStreamBuilder builder = new KStreamBuilder();
+KStream&lt;String, String&gt; kstream = builder.stream(stringSerde, stringSerde, "left- 
+source");
+KTable&lt;String, String&gt; ktable = builder.table(stringSerde, stringSerde, "right-source", 
+"kstream-ktable-join");
+
+KStream&lt;String, String&gt; joinedStream = kstream.leftJoin(ktable, new ValueJoiner&lt;String, 
+String, String&gt;() {
+    @Override
+    public String apply(String leftValue, String rightValue) {
+        return "left:" + leftValue + ", right:" + rightValue;
+    }
+}, Serdes.String(), Serdes.String());</code></pre>
+
+  <h3 id="nav_point_173" class="calibre9">7.3.4　变换操作</h3>
+
+  <p class="zw">Kafka Streams提供了流变换处理的基本函数，包括过滤操作的filter()，分组操作的GroupBy()和groupByKey()，映射操作的map()、mapValues()、flatMap()和flatMapValues()，以及转换函数transform()等。这些变换操作都可以将一个KStream和KTable对象变换为另一个KStream或KTable对象并且传给下游处理拓扑，将所有的操作连接起来就组成了一个复杂的处理拓扑。</p>
+
+  <p class="zw">我们通过一个简单的单词统计实例简单介绍Kafka Streams基本变换函数的应用。待统计的单词之间以逗号分隔保存在streams-foo主题当中。</p>
+
+  <p class="zw">首先以Kafka主题streams-foo作为数据源创建一个KStream记录流，如代码清单7-7所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-7　以Kafka主题streams-foo作为数据源创建一个KStream记录流</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount");
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+KStreamBuilder builder = new KStreamBuilder();
+// 构造一个KStream日志流
+KStream&lt;String, String&gt; textLine = builder.stream("streams-foo");</code></pre>
+
+  <p class="zw">然后通过filter()方法处理过滤掉无效数据，我们在这里只去掉空行，实现代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KStream&lt;String, String&gt; filteredLine= textLine.filter(new Predicate&lt;String, String&gt;() 
+    @Override
+    public boolean test(String key, String value) {
+    // 过滤操作，将不满足条件的数据去掉，当返回为false表示将该条数据集过滤掉
+        if(StringUtils.isBlank(value)){
+            return false;
+        }
+        return true;
+    }
+});</code></pre>
+
+  <p class="zw">在filter()方法中我们定义一个过滤规则，创建一个匿名类，在Predicate接口的test()方法中指定过滤规则，当满足某些条件返回false表示该条数据将被过滤掉。</p>
+
+  <p class="zw">然后通过flatMapValues()方法按行解析出单词，将单词放入一个迭代器中，代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KStream&lt;String, String&gt; wordStream = filteredLine.flatMapValues(new ValueMapper 
+&lt;String, Iterable&lt;String&gt;&gt;() {
+    @Override
+    public Iterable&lt;String&gt; apply(String value) {
+        return Arrays.asList(value.toLowerCase(Locale.getDefault()).split(",")); 
+        // 单词不区分大小写
+    }
+});</code></pre>
+
+  <p class="zw">同时，为了通过groupByKey()方法将单词分组，我们再通过map()函数进行处理，将每个单词构造成KeyValue实体，每一个KeyValue实体的键与值相同，即为单词本身。代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KStream&lt;String, String&gt; wordPairs = wordStream.map(new KeyValueMapper&lt;String, String, 
+KeyValue&lt;String,String&gt;&gt;() {
+    @Override
+    public KeyValue&lt;String, String&gt; apply(String key, String value) {
+            return new KeyValue&lt;String, String&gt;(value, value);
+    }
+});</code></pre>
+
+  <p class="zw">在构造KeyValue之后将单词按键分组，代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KGroupedStream&lt;String, String&gt; wordGroup= wordPairs.groupByKey();</code></pre>
+
+  <p class="zw">通过groupByKey()方法处理后将KStream变换成了一个KGroupStream对象，KGroupStream与KStream的区别在于KGroupStream是由 KStream中的每条数据集按照一定规则进行分组得到的分组日志流。</p>
+
+  <p class="zw">在分组之后通过调用count(final String storeName)方法统计每组单词的个数，并将统计结果打印输出。从这个方法的形参可以得到该方法是有状态的，需要保存状态结果。代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">KTable&lt;String,Long&gt; words=wordGroup.count("word-count");
+words.print();</code></pre>
+
+  <p class="zw">可以看到经由count()变换后将KGroupStream转换成了一个KTable对象。</p>
+
+  <p class="zw">至此单词统计的核心逻辑已完成，然后我们创建一个KafkaStreams对象并启动。最后通过Kafka shell输入几行数据，如图7-7所示（其中第2行和第6行是空行）。</p>
+
+  <p class="tu"><img alt="" src="../images/00129.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图7-7　单词统计样本</p>
+
+  <p class="zw">启动单词统计程序，在控制台的输出信息如图7-8所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00130.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图7-8　单词统计的输出结果</p>
+
+  <p class="zw">在Kafka shell中输入统计样本，每次执行该程序时每个单词数都是基于上次结果累加，这是因为count()操作是有状态的，执行结果会保存到本地存储仓库中，每次执行都会从本地查询上次的执行结果。</p>
+
+  <h3 id="nav_point_174" class="calibre9">7.3.5　聚合操作</h3>
+
+  <p class="zw">聚合操作是一种有状态的转换，在上一小节单词统计实例最后计算单词数的count()方法就是聚合操作的一种。本书所用Kafka Streams只实现了count()方法，但Kafka Streams定义一个aggregate()方法，同时提供了一个Aggregator接口，我们可以通过该接口的apply()方法，在该方法中实现聚集函数的相应功能，如求max、min、avg、count、sum等操作，Kafka Streams提供的count()方法，也是通过调用aggregate()方法实现的。日志流和更新日志流都有appregate()方法，不过在进行聚合操作前需要将KStream或KTable转为KGroupedStream或KGroupedTable，然后再调用appgregate()方法执行聚合操作。</p>
+
+  <p class="zw">现在通过Kafka Streams计算一组数据的最大值的简单程序来介绍Kafka Streams聚合类操作。对于KStream日志流，首先通过groupByKey()方法将KStream转为KGroupedStream，然后调用aggregate()方法，实现逻辑如代码清单7-8所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-8　KStream聚合操作求最大值的核心代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kstream.map(new KeyValueMapper&lt;String, String, KeyValue&lt;String,Integer&gt;&gt;() {
+    @Override
+    public KeyValue&lt;String, Integer&gt; apply(String key, String value) {
+        return new KeyValue&lt;String, Integer&gt;(key, Integer.parseInt(value));
+    }})
+.groupByKey(Serdes.String(),Serdes.Integer())
+.aggregate(new Initializer&lt;Integer&gt;() {
+    @Override
+    public Integer apply() {
+        return Integer.MIN_VALUE ;
+    }}, new Aggregator&lt;String, Integer, Integer&gt;() {
+        @Override
+        public Integer apply(String aggKey, Integer value, Integer aggregate) {
+            return value &gt; aggregate?value : aggregate;
+        }
+    },Serdes.Integer() , "max")</code></pre>
+
+  <p class="zw">由于是求最大值，所以在Initializer接口的apply()方法中设置初始值为Integer.MIN_VALUE，然后实现Aggregator接口在其apply()方法中比较该Key的新、老值返回较大者。代码清单7-8所示代码是基于JDK7编写的，如果用JDK8的Lambda表达式，则可将代码简化如代码清单7-9所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-9　KStream聚合操作求最大值核心代码的JDK8实现</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kstream.map((key, value) -&gt; {return new KeyValue&lt;String, Integer&gt;(key, 
+Integer.parseInt(value)); }) // 将String类型转为Integer
+.groupByKey(Serdes.String(),Serdes.Integer())
+.aggregate( () -&gt; Integer.MIN_VALUE,
+(String key, Integer value,Integer aggregate) -&gt; {return value &gt; aggregate ? value: 
+aggregate;}, Serdes.Integer(), "max")</code></pre>
+
+  <p class="zw">对于KStream日志流还提供了一个基于时间窗口的aggregate()方法，如果求1min之内的数据集的最大值，则关于调用aggregate()方法实现的逻辑修改如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">aggregate(() -&gt; Integer.MIN_VALUE, (String key,Integer value,Integer aggregate) -&gt;{return  value &gt; aggregate ? value : aggregate;}, TimeWindows.of(60 * 1000L).advanceBy(60*1000L), Serdes.Integer(), "max2").toStream().print();</code></pre>
+
+  <p class="zw">当将时间窗口设置为UnlimitedWindows.of()时即等同于不带时间窗口的集合操作。</p>
+
+  <p class="zw">如果对KTable对象通过聚合操作求最值，需要注意的是实例化KTable时需保证值的类型为数值型，如Integer、Long等，因为聚合操作时状态值会保存到aggregate()方法指定的状态仓库，这个状态仓库保存的值为数值类型，aggregate()方法指定的状态值的类型要与创建KTable指定值的类型一致，因此KTable就要求被定义为KTable&lt;String, Integer&gt;类型，这就要求生产者需指定消息的值序列化类型为数值类型对应的序列化类。</p>
+
+  <p class="zw">KTable通过聚合操作求最值的实现逻辑如代码清单7-10所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单7-10　KTable更新流聚合操作求最值的实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ktable-aggregate-test");
+props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+// Key序列化与反序化类
+props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.Integer().getClass());
+// Value序列化与反序化类
+props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "1000");
+props.put(StreamsConfig.POLL_MS_CONFIG, "10");
+
+KStreamBuilder builder = new KStreamBuilder();
+KTable&lt;String, Integer&gt; ktable = builder.table("ktable-aggregate", 
+"ktable-aggregate-store");// 指定值的类型为Integer
+ktable.groupBy((String key, Integer value) -&gt; {return new KeyValue&lt;String, Integer&gt; 
+(key, value); } ,Serdes.String(), Serdes.Integer())
+.aggregate( () -&gt; Integer.MIN_VALUE,
+       (key, value, aggregate) -&gt; value &gt; aggregate ? value: aggregate,
+       (key, value, aggregate) -&gt; value &gt; aggregate ? value: aggregate, "ktable-max"). 
+       toStream().print();
+KafkaStreams streams = new KafkaStreams(builder, props);
+streams.start();</code></pre>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0010_split_002.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0010_split_004.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

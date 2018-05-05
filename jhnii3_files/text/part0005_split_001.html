@@ -1,0 +1,1288 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0005_split_000.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0005_split_002.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_19" class="sigil_not_in_toc">2.1　基础环境配置</h2>
+
+  <p class="zw">由于Kafka是用Scala语言开发的，运行在JVM上，因此在安装Kafka之前需要先安装JDK。</p>
+
+  <h3 id="nav_point_20" class="calibre9">2.1.1　JDK安装配置</h3>
+
+  <p class="zw">最新版本的Kafka需要运行在JDK 1.7以上，Kafka官方网站推荐使用JDK 1.8，因此本书所应用的JDK环境采用JDK 1.8。下面将详细介绍JDK 1.8安装步骤。</p>
+
+  <h4 class="sigil_not_in_toc1">1．Windows安装JDK</h4>
+
+  <p class="zw">（1）<strong class="calibre1">下载并安装</strong>。首先在Oracle官方网站http://www.oracle.com/technetwork/java/javase/ downloads/jdk8-downloads-2133151.html下载JDK 1.8安装文件，根据操作系统类型选择相应的JDK版本。我使用的是64位操作系统，因此下载jdk-8u111-windows-x64.exe安装文件。下载完成后，双击运行安装。在安装时可以选择安装路径，这里在安装时全使用默认路径。</p>
+
+  <p class="zw">（2）<strong class="calibre1">环境变量配置</strong>。在系统变量中新增变量名JAVA_HOME，变量值为JDK 1.8安装路径。由于Java默认安装在Program Files目录下，这个目录名之间有空格，有可能在运行某些应用时因JDK安装路径有空格而报错。例如，我在安装JDK后，运行Kafka时报如下错误：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">错误: 找不到或无法加载主类 Files\Java\jdk1.8.0_111\lib\dt.jar;C:\Program</code></pre>
+
+  <p class="zw">为了避免出现类似的错误，在Windows系统上，若JDK安装在Program File目录下，在设置JAVA_HOME时，用该目录别名PROGRA～1，因此将JAVA_HOME设置为C:\PROGRA～1\Java\jdk1.8.0_111。新增变量名CLASSPATH，变量值为.;% JAVA_HOME%\lib\dt.jar;% JAVA_HOME%\ lib\tools.jar。本步操作JDK环境变量配置如表2-1所示。</p>
+
+  <p class="biao_ti">表2-1　JDK环境变量配置</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">变 量 类 型</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">变　量　名</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">变　量　值</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">系统变量</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">JAVA_HOME</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">C:\PROGRA～1\Java\jdk1.8.0_111</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">用户变量</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">CLASSPATH</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">.;% JAVA_HOME%\lib\dt.jar;%JAVA_HOME%\lib\tools.jar</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">（3）<strong class="calibre1">验证</strong>。环境变量配置完成后，在Windows的cmd终端输入查看Java版本的命令，以此来验证JDK安装配置是否成功。命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java –version</code></pre>
+
+  <p class="zw">若输出为以下JDK版本信息，则表示JDK 1.8已安装成功，且为系统默认JDK。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java version "1.8.0_111"
+Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
+Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)</code></pre>
+
+  <h4 class="sigil_not_in_toc1">2．Linux安装JDK</h4>
+
+  <p class="zw">一些Linux的发行版默认已安装了JDK，如OpenJDK，这里所用的Linux操作系统默认已经安装了OpenJDK。输入下面的命令查看JDK版本信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java  –version</code></pre>
+
+  <p class="zw">输出JDK版本信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java version "1.7.0_45"
+OpenJDK Runtime Environment (rhel-2.4.3.3.el6-x86_64 u45-b15)
+OpenJDK 64-Bit Server VM (build 24.45-b08, mixed mode)</code></pre>
+
+  <p class="zw">然而有些Linux系统并没有安装JDK，因此本小节将详细讲解如何在Linux中安装JDK。这里我们讲解JDK 1.8的安装。</p>
+
+  <p class="zw">（1）<strong class="calibre1">下载并安装</strong>。进入Oracle官方网站http://www.oracle.com/technetwork/Java/Javase/downloads/ jdk8-downloads-2133151.html下载Linux版本的JDK 1.8安装包。这里我们下载的安装包版本为jdk-8u111-linux-x64.gz，并将安装包解压到/usr/local/software/Java路径下。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">tar -xzvf jdk-8u111-linux-x64.gz      # 解压jdk安装包</code></pre>
+
+  <p class="zw">将安装包解压后，即完成JDK的安装。</p>
+
+  <p class="zw">（2）<strong class="calibre1">配置环境变量</strong>。在/etc/profile文件中添加JDK和JRE的路径，并添加到Path中，操作命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">vi /etc/profile      # 编辑profile文件</code></pre>
+
+  <p class="zw">在文件中添加以下内容：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">export JAVA_HOME=/usr/local/software/Java/jdk1.8.0_111
+export JRE_HOME=/usr/local/software/Java/jdk1.8.0_111/jre
+export PATH=$PATH:$JAVA_HOME/bin:$JRE_HOME/bin</code></pre>
+
+  <p class="zw">保存退出。若系统默认安装了OpenJDK，则用户可以选择将其删除，也可以修改配置用最新安装的版本替换OpenJDK。这里选择用新安装的JDK替换系统自带的OpenJDK，则按序执行以下命令。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">将Java添加到bin：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">    update-alternatives --install /usr/bin/Java Java /usr/local/software/Java/jdk1.8.0_111 300</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">将Javac添加到bin：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">    update-alternatives --install /usr/bin/Javac Javac /usr/local/software/   
+         Java/jdk1.8.0_111/bin/Javac 300</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">选择JDK版本：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">    update-alternatives --config Java</code></pre>
+
+  <p class="zw">执行以上命令会出现JDK版本选择界面，如图2-1所示。这里我们选择新安装的JDK 1.8，即输入序号3，按回车键。</p>
+
+  <p class="tu"><img alt="" src="../images/00003.gif" class="calibre7"/></p>
+
+  <p class="tu_ti">图2-1　Linux控制台展示的JDK版本选择命令行界面</p>
+
+  <p class="zw">环境变量配置好后执行以下命令，让刚才的修改操作立即生效：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">    source /etc/profile           # 让对/etc/profile的修改立即生效</code></pre>
+
+  <p class="zw">（3）<strong class="calibre1">验证</strong>。输入查看JDK版本命令，查看环境变量配置是否成功，执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java –version      # 查看jdk版本</code></pre>
+
+  <p class="zw">输出以下JDK版本信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Java version "1.8.0_111"
+Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
+Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)</code></pre>
+
+  <p class="zw">由以上JDK版本信息可知，JDK版本已替换为新安装的JDK 1.8版本。至此，JDK安装完成。</p>
+
+  <h3 id="nav_point_21" class="calibre9">2.1.2　SSH安装配置</h3>
+
+  <p class="zw">对Kafka集群本身来讲，配置SSH免密钥登录并不是必需的步骤，但作为分布式系统，一般会由多台机器构成。为了便于操作管理，如通过SSH方式启动集群代理等，这里对SSH安装配置进行介绍。</p>
+
+  <p class="zw">（1）在根目录下查看是否存在一个隐藏文件夹.ssh。若没有该文件夹，则在确保机器联网条件下执行以下命令安装ssh：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">sudo apt-get install ssh      # 安装ssh</code></pre>
+
+  <p class="zw">（2）进入.ssh目录，生成密钥对，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">ssh-keygen -t rsa      # 产生密钥</code></pre>
+
+  <p class="zw">在执行以上命令时一路回车即可。ssh-keygen用于生成认证密钥，-t用来指定密钥类型，这里选择rsa密钥。执行完毕后会在～/.ssh目录下生成id_rsa和id_rsa.pub两个文件，其中id_rsa为私钥文件，id_rsa.pub为公钥文件。依次在集群其他机器上完成步骤1和步骤2。</p>
+
+  <p class="zw">（3）将id_rsa.pub文件内容追加到授权的key文件中，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys      # 追加公钥到授权文件中</code></pre>
+
+  <p class="zw">若是单机环境，则至此已完成ssh配置。</p>
+
+  <p class="zw">（4）将第一台机器的authorized_keys文件复制到第二台机器上，并将第二台机器的公钥也追加到authorized_keys文件中，依次执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">scp authorized_keys root@172.117.12.62:~/.ssh/   # 复制第一台机器的授权文件到第二台机器
+cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys  # 在第二台机器上执行此命令，将第二台机器的公钥追加到授权文件中</code></pre>
+
+  <p class="zw">（5）将第二台机器的authorized_keys文件复制到第三台机器上，并将第三台机器的公钥追加到authorized_keys文件中，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">scp authorized_keys root@172.117.12.63:~/.ssh/   # 复制第二台机器的授权文件到第三台机器
+cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys   # 在第三台机器上执行此命令，将第三台机器的公钥追加到授权文件中</code></pre>
+
+  <p class="zw">若集群还有更多机器，则依此类推完成授权文件合并。至此 ssh 配置完成，在已配置 ssh的任何一台机器上均可免密登录到其他机器。例如，在第一台机器上执行以下ssh命令，输出如下（首次登录会让输入密码）：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[root@rhel65 .ssh]# ssh 172.117.12.61
+The authenticity of host '172.117.12.61 (172.117.12.61)' can't be established.
+RSA key fingerprint is a3:5b:a9:29:ed:00:74:f4:ce:51:e5:7c:42:5b:8d:44.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '172.117.12.61' (RSA) to the list of known hosts.
+root@172.117.12.61's password: 
+Last login: Wed Feb  8 17:30:11 2017 from server-1
+[root@rhel65 ~]# ssh 172.117.12.61
+Last login: Wed Feb  8 17:32:04 2017 from server-3
+[root@rhel65 ~]# ssh 172.117.12.62
+Last login: Wed Feb  8 17:26:09 2017 from server-1</code></pre>
+
+  <h3 id="nav_point_22" class="calibre9">2.1.3　ZooKeeper环境</h3>
+
+  <p class="zw">ZooKeeper是一个分布式应用程序协调服务框架，分布式应用程序可以基于ZooKeeper来实现同步服务、配置维护、命名服务等，ZooKeeper能提供基于类似于文件系统的目录节点树方式的数据存储，通过监控各节点数据状态的变化，达到基于数据的集群管理。ZooKeeper主要由表2-2所示的几个角色构成。</p>
+
+  <p class="biao_ti">表2-2　ZooKeeper集群主要角色说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">角　　色</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge"/>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">描　　述</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Leader</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge"/>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">集群的领导者，负责投票的发起和决议及更新系统状态</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Learner</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Follower</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">跟随者，接受客户端的请求并返回结果给客户端，参与投票</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge"/>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Observer</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">接受客户端的请求，将写的请求转发给Leader，不参与投票。Observer目的是扩展系统，提高读的速度</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">关于ZooKeeper的原理及其他相关知识，读者可查阅ZooKeeper官方网站（http://mirrors. cnnic.cn/apache/zookeeper/）及相关书籍进行深入了解。</p>
+
+  <p class="zw">Kafka依赖ZooKeeper，通过ZooKeeper来对代理、消费者上下线管理、集群、分区元数据管理等，因此ZooKeeper也是Kafka得以运行的基础环境之一。</p>
+
+  <p class="zw">进入ZooKeeper官方网站http://mirrors.cnnic.cn/apache/zookeeper/下载ZooKeeper（本书所用ZooKeeper版本为zookeeper-3.4.8），然后将下载文件解压到指定目录。对ZooKeeper的安装，下面按Windows和Linux分别进行讲解。</p>
+
+  <h4 class="sigil_not_in_toc1">1．Windows安装ZooKeeper</h4>
+
+  <p class="zw">一般会选择在Linux操作系统上安装和部署分布式服务，因此这里并不打算讲解Windows环境下ZooKeeper集群环境搭建，只是简单介绍Windows环境下ZooKeeper单机模式的安装。</p>
+
+  <p class="zw">（1）<strong class="calibre1">解压安装</strong>。首先将ZooKeeper安装包zookeeper-3.4.8.tar.gz解压到相应目录，这里将ZooKeeper解压到D:\software\zookeeper-3.4.8目录下。然后进入ZooKeeper安装路径conf目录下，会看到ZooKeeper提供了一个zoo_sample.cfg的配置模板，将该文件重命名为zoo.cfg。zoo.cfg文件中只需修改dataDir和dataLogDir配置，其他配置使用默认值（其他配置及其含义将在下面的“Linux搭建ZooKeeper环境”小节详细介绍）。这里对dataDir和dataLogDir配置如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">dataDir=F:\\zookeeper\\data
+dataLogDir=F:\\zookeeper\\logs</code></pre>
+
+  <p class="zw">至此，Windows环境下ZooKeeper安装配置完成。下面进入ZooKeeper安装路径bin目录下，启动及验证ZooKeeper安装是否成功。</p>
+
+  <p class="zw">（2）<strong class="calibre1">验证</strong>。执行启动ZooKeeper命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">zkServer.cmd    # windows下启动ZooKeeper</code></pre>
+
+  <p class="zw">若输出没有任何错误，通过jps命令可以看到ZooKeeper相关进程。输入命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">jps  # 查看Java进程命令</code></pre>
+
+  <p class="zw">输出结果中至少包括以下进程名：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">12008 QuorumPeerMain
+11596 Jps</code></pre>
+
+  <p class="zw">还可以进入ZooKeeper的安装路径bin目录下，通过ZooKeeper客户端连接到ZooKeeper服务，执行以下命令进一步验证ZooKeeper是否安装成功：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">zkCli.cmd -server 127.0.0.1:2181   # 登录到ZooKeeper服务器</code></pre>
+
+  <p class="zw">在输出信息中会看到“Welcome to ZooKeeper!”，同时显示接受命令输入界面。</p>
+
+  <p class="zw">在客户端输入：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">ls /      # 查看ZooKeeper服务器目录结构</code></pre>
+
+  <p class="zw">此时ZooKeeper服务器中仅有一个zookeeper节点，信息显示如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: 127.0.0.1:2181(CONNECTED) 0] ls /
+[zookeeper]</code></pre>
+
+  <p class="zw">至此，Windows环境下安装ZooKeeper讲解完毕。</p>
+
+  <h4 class="sigil_not_in_toc1">2．Linux搭建ZooKeeper环境</h4>
+
+  <p class="zw">在Linux环境下ZooKeeper单机模式配置与上一小节介绍的Windows环境下ZooKeeper安装配置的操作步骤基本相同，因此本小节直接介绍ZooKeeper分布式环境搭建。下面将讲解在Linux环境下如何配置由3台机器构成的ZooKeeper集群环境，这3台机器的IP地址分别为172.117.12.61、172.117.12.62和172.117.12.63。</p>
+
+  <p class="zw">（1）<strong class="calibre1">解压安装</strong>。首先在3台机器上分别将zookeeper-3.4.8.tar.gz解压到/usr/local/software/ zookeeper目录。进入解压后的zookeeper-3.4.8 /conf目录，将zoo.sample.cfg重命名为zoo.cfg。关于ZooKeeper配置文件中几个基础配置项的说明如表2-3所示。</p>
+
+  <p class="biao_ti">表2-3　ZooKeeper基础配置说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">配　置　项</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">默　认　值</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">说　　明</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">tickTime</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">2000ms</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">ZooKeeper中的一个时间单元。ZooKeeper中所有时间都以这个时间单元为基准，进行整数倍配置，默认是2 s</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">initLimit</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">10</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Follower在启动过程中，会从Leader同步所有最新数据，确定自己能够对外服务的起始状态。当Follower在initLimt个tickTime还没有完成数据同步时，则Leader仍为Follower连接失败</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">syncLimit</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">5</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">Leader与Follower之间通信请求和应答的时间长度。若Leader在syncLimit个tickTime还没有收到Follower应答，则认为该Leader已下线</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">dataDir</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/tmp/zookeeper</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">存储快照文件的目录，默认情况下，事务日志也会存储在该目录上。由于事务日志的写性能直接影响ZooKeeper性能，因此建议同时配置参数dataLogDir</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">dataLogDir</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">/tmp/zookeeper</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">事务日志输出目录</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">clientPort</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">2181</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">ZooKeeper对外端口</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">请读者根据自已服务器环境，修改zoo.cfg文件中表2-3提及参数的配置。这里只修改了以下两个配置项，其他几个基础配置沿用默认值。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">dataDir=/opt/data/zookeeper/data
+dataLogDir=/opt/data/zookeeper/logs</code></pre>
+
+  <p class="zw">若是单机模式，操作至此完成。接下来配置将3台机器构成一个分布式集群。</p>
+
+  <p class="zw">（2）<strong class="calibre1">集群配置</strong>。首先在3台机器的/etc/hosts文件中加入3台机器的IP与机器域名映射，域名自定义，这里分别命名为server-1、server-2、server-3，3台机器IP与机器域名映射关系如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">172.117.12.61 server-1
+172.117.12.62 server-2
+172.117.12.63 server-3</code></pre>
+
+  <p class="zw">然后进入其中一台机器的ZooKeeper安装路径conf目录。这里我们选择在IP为172.117.12.61的机器上进行配置，编辑conf/zoo.cfg文件，在该文件中添加以下配置：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">server.1=server-1:2888:3888
+server.2=server-2:2888:3888
+server.3=server-3:2888:3888</code></pre>
+
+  <p class="zw">为了便于讲解以上配置，在这里抽象一个公式，即server.n=n-server-domain:port1:port2。这个公式中的n是一个数字类型常量，这里配置的1、2和3用于表示第几台ZooKeeper服务器；n-server-domain表示第n台ZooKeeper服务器的IP所映射的域名，当然这里也可以是第n台机器的IP；port1表示该服务器与集群中的Leader交换信息的端口，默认是2888；port2表示选举时服务器相互通信的端口。</p>
+
+  <p class="zw">接着在${dataDir}路径下创建一个myid文件。myid里存放的值就是服务器的编号，即对应上述公式中的n，在这里第一台机器myid存放的值为1。ZooKeeper在启动时会读取myid文件中的值与zoo.cfg文件中的配置信息进行比较，以确定是哪台服务器。</p>
+
+  <p class="zw">在zoo.cfg文件中我们同时配置了3台机器，因此接下来通过scp命令将本台机器的zoo.cfg文件复制到另外两台机器相应目录进行替换。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">scp zoo.cfg root@172.117.12.62:/usr/local/software/zookeeper/zookeeper-3.4.8/conf/
+scp zoo.cfg root@172.117.12.63:/usr/local/software/zookeeper/zookeeper-3.4.8/conf/</code></pre>
+
+  <p class="zw">然后分别修改另外两台机器的myid。同时，为了操作方便，我们将ZooKeeper相关环境变量添加到/etc/profile文件当中。</p>
+
+  <p class="zw">设置ZooKeeper安装路径，在/etc/profile相关环境变量配置中添加以下信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">export ZOOKEEPER_HOME=/usr/local/software/zookeeper/zookeeper-3.4.8</code></pre>
+
+  <p class="zw">在该文件的Path配置项最后加上:$ZOOKEEPER_HOME/bin。注意，在$ZOOKEEPER_HOME前有一个冒号。然后执行source/etc/profile命令使所做的修改操作立即生效。其他两台机器也进行同样的环境设置。至此，由3台机器构成的分布式ZooKeeper环境搭建步骤介绍完毕。下面启动ZooKeeper进行验证。</p>
+
+  <p class="zw">（3）<strong class="calibre1">验证</strong>。由于配置了ZooKeeper环境变量，因此无需进入ZooKeeper安装路径bin目录下。在这3台机器上分别启动ZooKeeper：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">zkServer.sh start    # 启动ZooKeeper服务</code></pre>
+
+  <p class="zw">输出如下信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">ZooKeeper JMX enabled by default
+Using config: /usr/local/software/zookeeper/zookeeper-3.4.8/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED</code></pre>
+
+  <p class="zw">查看这3台ZooKeeper服务器状态，依次在这3台机器上执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">zkServer.sh status    # 查询zookeeper状态</code></pre>
+
+  <p class="zw">执行上述启动命令，其中有两台机器输出以下信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">ZooKeeper JMX enabled by default
+Using config: /usr/local/software/zookeeper/zookeeper-3.4.8/bin/../conf/zoo.cfg
+Mode: follower</code></pre>
+
+  <p class="zw">另外一台机器输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">ZooKeeper JMX enabled by default
+Using config: /usr/local/software/zookeeper/zookeeper-3.4.8/bin/../conf/zoo.cfg
+Mode: leader</code></pre>
+
+  <p class="zw">可以看到，这3台机器中，一台机器作为Leader，其他两台服务器作为Follower。同时，可以查看zookeeper.out文件内容，通过启动日志进一步了解ZooKeeper运行过程。至此，ZooKeeper集群环境搭建讲解完毕。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0005_split_000.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0005_split_002.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

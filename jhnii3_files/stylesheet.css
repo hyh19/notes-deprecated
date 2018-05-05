@@ -1,0 +1,402 @@
+.biao_ti {
+    display: block;
+    font-size: 0.83333em;
+    font-weight: bold;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: center;
+    text-indent: 0
+    }
+.biao_tou_dan_yuan_ge {
+    display: block;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-indent: 0
+    }
+.calibre {
+    display: block;
+    font-size: 1em;
+    margin-bottom: 0;
+    margin-left: 5pt;
+    margin-right: 5pt;
+    margin-top: 0;
+    padding-left: 0;
+    padding-right: 0
+    }
+.calibre1 {
+    font-weight: bold
+    }
+.calibre2 {
+    border-bottom-color: currentColor;
+    border-bottom-style: inset;
+    border-bottom-width: 1px;
+    border-left-color: currentColor;
+    border-left-style: inset;
+    border-left-width: 1px;
+    border-right-color: currentColor;
+    border-right-style: inset;
+    border-right-width: 1px;
+    border-top-color: currentColor;
+    border-top-style: inset;
+    border-top-width: 1px;
+    color: gray;
+    display: block;
+    height: 2px;
+    margin-bottom: 0.5em;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 0.5em
+    }
+.calibre3 {
+    text-decoration: none
+    }
+.calibre4 {
+    display: block;
+    line-height: 1.7em;
+    list-style-type: disc;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em
+    }
+.calibre5 {
+    display: block;
+    line-height: 1.7em;
+    list-style-type: circle;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0
+    }
+.calibre6 {
+    display: block;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: right;
+    text-indent: 0
+    }
+.calibre7 {
+    height: auto;
+    width: auto
+    }
+.calibre8 {
+    font-style: italic
+    }
+.calibre9 {
+    color: #0092DD;
+    display: block;
+    font-size: 1.29167em;
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    padding-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0
+    }
+.calibre10 {
+    font-family: Courier, Menlo, Monaco, Consolas, monospace
+    }
+.calibre11 {
+    border-collapse: collapse;
+    border-spacing: 0;
+    display: table;
+    margin-bottom: 30px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 15px;
+    text-indent: 0
+    }
+.calibre12 {
+    display: table-header-group;
+    vertical-align: middle
+    }
+.calibre13 {
+    display: table-row;
+    vertical-align: inherit
+    }
+.calibre14 {
+    border-bottom-color: #000;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-left-color: #000;
+    border-left-style: solid;
+    border-left-width: 1px;
+    border-right-color: #000;
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-top-color: #000;
+    border-top-style: solid;
+    border-top-width: 1px;
+    display: table-cell;
+    font-size: 0.75em;
+    font-weight: bold;
+    padding-bottom: 0.3em;
+    padding-left: 0.3em;
+    padding-right: 0.3em;
+    padding-top: 0.3em;
+    page-break-inside: avoid;
+    text-align: center;
+    vertical-align: auto
+    }
+.calibre15 {
+    display: table-row-group;
+    vertical-align: middle
+    }
+.calibre16 {
+    border-bottom-color: #000;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-left-color: #000;
+    border-left-style: solid;
+    border-left-width: 1px;
+    border-right-color: #000;
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-top-color: #000;
+    border-top-style: solid;
+    border-top-width: 1px;
+    display: table-cell;
+    font-size: 0.75em;
+    padding-bottom: 0.3em;
+    padding-left: 0.3em;
+    padding-right: 0.3em;
+    padding-top: 0.3em;
+    page-break-inside: avoid;
+    text-align: left;
+    vertical-align: auto
+    }
+.calibre17 {
+    background-color: #f1f6fc;
+    display: table-row;
+    vertical-align: inherit
+    }
+.calibre18 {
+    height: auto;
+    width: 50%
+    }
+.calibre19 {
+    height: auto;
+    width: 60%
+    }
+.calibre20 {
+    font-size: 0.75em;
+    line-height: normal;
+    vertical-align: sub
+    }
+.calibre21 {
+    display: block;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: left;
+    text-indent: 0
+    }
+.chao_qiang_ti_shi {
+    background: #fff;
+    border-bottom-color: #5bbcdd;
+    border-bottom-style: dotted;
+    border-bottom-width: 1px;
+    border-left-color: #999;
+    border-left-style: solid;
+    border-left-width: 5px;
+    border-right-color: #5bbcdd;
+    border-right-style: dotted;
+    border-right-width: 1px;
+    border-top-color: #5bbcdd;
+    border-top-style: dotted;
+    border-top-width: 1px;
+    display: block;
+    font-size: 0.75em;
+    line-height: 200%;
+    margin-bottom: 1.4em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1.4em;
+    padding-bottom: 0;
+    padding-left: 5px;
+    padding-right: 0;
+    padding-top: 0;
+    word-wrap: break-word
+    }
+.dai_ma_qing_dan_biao_ti {
+    display: block;
+    font-size: 0.83333em;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: right;
+    text-indent: 0
+    }
+.dai_ma_wu_xing_hao {
+    border-bottom-color: #000;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-left-color: #000;
+    border-left-style: solid;
+    border-left-width: 1px;
+    border-right-color: #000;
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-top-color: #000;
+    border-top-style: solid;
+    border-top-width: 1px;
+    display: block;
+    font-family: Courier, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75em;
+    margin-bottom: 1.3em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1.3em;
+    padding-bottom: 0.3em;
+    padding-left: 0.3em;
+    padding-right: 0.3em;
+    padding-top: 0.3em;
+    white-space: pre-wrap;
+    word-wrap: break-word
+    }
+.di_1ji_wu_xu_lie_biao {
+    display: list-item
+    }
+.editing-tag {
+    background-color: #333;
+    border-bottom-color: currentColor;
+    border-bottom-style: none;
+    border-bottom-width: medium;
+    border-left-color: currentColor;
+    border-left-style: none;
+    border-left-width: medium;
+    border-radius: 2px;
+    border-right-color: currentColor;
+    border-right-style: none;
+    border-right-width: medium;
+    border-top-color: currentColor;
+    border-top-style: none;
+    border-top-width: medium;
+    color: #fff;
+    display: block;
+    float: left;
+    font-size: 0.75em;
+    font-weight: bold;
+    line-height: 1.7em;
+    margin-bottom: 0;
+    margin-left: 10px;
+    margin-right: 3px;
+    margin-top: 0;
+    padding-bottom: 0;
+    padding-left: 4px;
+    padding-right: 4px;
+    padding-top: 0;
+    text-indent: 0;
+    white-space: nowrap
+    }
+.not-in-toc {
+    background-color: #f1f6fc;
+    color: #0092DD;
+    display: block;
+    font-size: 1.66667em;
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 0.67em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0.67em;
+    padding-bottom: 1em;
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-top: 1em;
+    text-align: center
+    }
+.sgc-toc-level {
+    display: block;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em
+    }
+.sgc-toc-level1 {
+    display: block
+    }
+.sgc-toc-title {
+    display: block;
+    font-size: 2em;
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 2em;
+    text-align: center
+    }
+.sigil_not_in_toc {
+    background-color: #f1f6fc;
+    color: #0092DD;
+    display: block;
+    font-size: 1.29167em;
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 0.83em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0.83em;
+    padding-bottom: 0.3em;
+    padding-left: 0.3em;
+    padding-right: 0.3em;
+    padding-top: 0.3em
+    }
+.sigil_not_in_toc1 {
+    color: #0092DD;
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    padding-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0
+    }
+.tu {
+    display: block;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: center;
+    text-indent: 0
+    }
+.tu_ti {
+    display: block;
+    font-size: 0.83333em;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-align: center;
+    text-indent: 0
+    }
+.zw {
+    display: block;
+    line-height: 1.7em;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em;
+    text-indent: 2em
+    }

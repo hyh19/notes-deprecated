@@ -1,0 +1,1291 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0008_split_005.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0008_split_007.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_124" class="sigil_not_in_toc">5.6　分区操作</h2>
+
+  <p class="zw">本节详细介绍分区管理相关操作，包括分区Leader平衡、分区迁移、增加分区及副本的详细操作步骤。在5.6.2节会穿插介绍分区迁移时流量控制相关的验证操作。</p>
+
+  <h3 id="nav_point_125" class="calibre9">5.6.1　分区Leader平衡</h3>
+
+  <p class="zw">当创建一个主题时，该主题的分区及副本会被均匀地分配到Kafka集群相应节点上，这样优先副本也在集群中均匀地分布。通常当一个主题创建后优先副本会作为分区的Leader副本，Leader负责所有的读写操作。但随着运行时间的推移，当Leader节点发生故障时，就会从Follower节点中选出一个新的Leader，这样就有可能导致集群的负载不均衡，从而影响整个集群的健壮性和稳定性。当原Leader节点恢复后再次加入到集群时也不会主动成为Leader副本。Kafka提供了两种方法重新选择优先副本作为分区Leader的方法，使集群负载重新达到平衡。</p>
+
+  <p class="zw">（1）自动平衡：在代理节点启动时，设置auto.leader.rebalance.enable=true，默认为true。当该配置为true时，控制器在故障转移操作时会启动一个定时任务，每隔${leader.imbalance. check.interval.seconds}秒（默认是5min）触发一次分区分配均衡操作，而只有在代理的不均衡的百分比达到${leader.imbalance.per.broker.percentage}（该配置默认是10，即不均衡比例达到10%）以上时才会真正执行分区重新分配操作。若该配置设置为false，当某个节点在失效前是某个分区的优先副本，即失效前是Leader副本，该节点恢复后它也只是一个Follower副本。</p>
+
+  <p class="zw">（2）手动平衡：Kafka提供了一个对分区Leader进行重新平衡的工具脚本kafka-preferred- replica-election.sh，通过该工具将优先副本选举为Leader，从而重新让集群分区达到平衡。</p>
+
+  <p class="zw">第一种方法Kafka自动触发，但存在一定时间的延迟，第二种方法需要手动执行，同时提供更细粒度的分区均衡操作，支持以JSON字符串形式指定需要触发平衡操作的分区列表。若不指定分区，则会尝试对所有分区执行将优先副本选为Leader副本。</p>
+
+  <p class="zw">例如，查看当前主题“kafka-action”分区副本分布信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 --describe 
+--topic kafka-action</code></pre>
+
+  <p class="zw">分区副本信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:kafka-action   PartitionCount:3  ReplicationFactor:2   Configs:
+Topic: kafka-action  Partition: 0  Leader: 1  Replicas: 1,2  Isr: 1,2
+Topic: kafka-action  Partition: 1  Leader: 2  Replicas: 2,3  Isr: 3,2
+Topic: kafka-action  Partition: 2  Leader: 3  Replicas: 3,1  Isr: 1,3</code></pre>
+
+  <p class="zw">从当前分区副本信息可知，当前主题的Leader是均匀分布于集群的3个节点之上。假设Kafka集群设置auto.leader.rebalance.enable=false，即关闭了分区Leader自动平衡操作，现在执行以下命令暂时关闭brokerId为 2的节点：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-server-stop.sh</code></pre>
+
+  <p class="zw">再次查看该主题分区及副本分布情况：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:kafka-action   PartitionCount:3  ReplicationFactor:2  Configs:
+Topic: kafka-action  Partition: 0  Leader: 1  Replicas: 1,2  Isr: 1
+Topic: kafka-action  Partition: 1  Leader: 3  Replicas: 2,3  Isr: 3
+Topic: kafka-action  Partition: 2  Leader: 3  Replicas: 3,1  Isr: 1,3</code></pre>
+
+  <p class="zw">从当前的分区副本分布情况可知，brokerId为 2的节点关闭后，分区1的Leader转移到AR列表中的另一个brokerId为3的节点上，这样就会增加该节点负载。若过一段时间重新启动brokerId为2的节点，由于关闭了分区自动平衡功能，因此需要手动执行分区平衡操作才能重新将brokerId为2的节点选举为分区1的Leader。下面详细介绍手动平衡分区的具体操作。</p>
+
+  <p class="zw">首先，在${KAFKA_HOME}/config目录下创建一个partitions-leader-election.json文件，内容如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{"partitions":[{"topic": "kafka-action", "partition": 1}]}</code></pre>
+
+  <p class="zw">该文件配置对主题“kafka-action”的分区编号为1的分区进行平衡操作。执行以下命令重新启动brokerId为 2的节点：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-server-start.sh -daemon ../config/server.properties</code></pre>
+
+  <p class="zw">然后，执行以下命令进行分区Leader平衡操作：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-preferred-replica-election.sh --zookeeper server-1:2181,server-2:2181,
+server-3:2181 --path-to-json-file ../config/partitions-leader-election.json</code></pre>
+
+  <p class="zw">再次查看分区副本分布信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:kafka-action   PartitionCount:3  ReplicationFactor:2    Configs:
+Topic: kafka-action  Partition: 0  Leader: 1   Replicas: 1,2  Isr: 1,2
+Topic: kafka-action  Partition: 1  Leader: 2   Replicas: 2,3  Isr: 3,2
+Topic: kafka-action  Partition: 2  Leader: 3   Replicas: 3,1  Isr: 1,3</code></pre>
+
+  <p class="zw">从分区分布信息可知，当brokerId为2的节点重新启动后，经过手动分区平衡操作之后分区1的优先副本节点重新成为该分区的Leader副本。</p>
+
+  <h3 id="nav_point_126" class="calibre9">5.6.2　分区迁移</h3>
+
+  <p class="zw">本小节介绍kafka-reassign-partitions.sh脚本的用法，该脚本在集群扩容、节点下线等场景时对分区迁移操作，从而使集群负载达到均衡。</p>
+
+  <p class="zw">当下线一个节点前，需要将该节点上的分区副本迁移到其他可用节点上，Kafka并不会自动进行分区副本迁移，若不进行手动重新分配，就会导致某些主题数据丢失和不可用的情况。当新增节点时，也只有新创建的主题才会分配到新的节点上，而之前主题的分区并不会自动分配到新加入的节点上，因为在主题创建时，该主题的AR列表中并没有新加入的节点。为了解决这些问题，就需要让分区副本再次进行合理的分配。</p>
+
+  <p class="zw">本小节分别对节点下线、集群扩容两种应用场景分区副本的迁移进行讲解，详细介绍分区迁移操作的基本步骤。</p>
+
+  <h4 class="sigil_not_in_toc1">1．节点下线分区迁移</h4>
+
+  <p class="zw">首先，执行以下命令创建一个主题。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --zookeeper server-1:2181,server-2:2181,server-3:2181  --create 
+--topic reassign-partitions --partitions 3  --replication-factor 1</code></pre>
+
+  <p class="zw">该主题分区副本分布情况如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:reassign-partitions  PartitionCount:3  ReplicationFactor:1  Configs:
+Topic: reassign-partitions Partition: 0 Leader: 1    Replicas: 1  Isr: 1
+Topic: reassign-partitions Partition: 1 Leader: 2    Replicas: 2  Isr: 2
+Topic: reassign-partitions Partition: 2 Leader: 3    Replicas: 3  Isr: 3</code></pre>
+
+  <p class="zw">然后，假设需要将brokerId为2的节点下线，在下线前我们通过Kafka提供的kafka- reassign-partitions.sh脚本按以下步骤将该分区转移到其他节点上。</p>
+
+  <p class="zw">（1）生成分区分配方案。首先创建一个文件，该文件以JSON字符串格式指定要进行分区重分配的主题。例如，我在$KAFKA_HOME/config目录下创建一个名为topics-to-move.json的文件，该文件内容如代码清单5-3所示。若要对多个主题分区重新分配，则以JSON格式指定多组“topic”，version为固定值。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-3　topics-to-move.json文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{"topics":
+   [{"topic":"reassign-partitions"}],
+   "version": 1
+}</code></pre>
+
+  <p class="zw">然后执行以下生成分区分配方案的命令。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--topics-to-move-json-file  ../config/topics-to-move.json  --broker-list "1,3"  --generate</code></pre>
+
+  <p class="zw">该命令的各个参数说明如下。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">zookeeper：指定ZooKeeper地址，从ZooKeeper获取主题元数据信息。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">topic-to-move-json-file：指定分区重分配对应的主题配置文件的路径，该配置文件的内容为以JSON格式指定需要进行分区重分配的主题。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">broker-list：指定分区可迁移的brokerId列表。本例是要下线brokerId为2的节点，需要将该节点的分区迁移到brokerId为1和3的节点上，因此这里指定brokerId的列表为“1，3”。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">generate：指定该命令类型为生成一个分区分配的参考配置。</li>
+  </ul>
+
+  <p class="zw">该命令底层实现原理为：从ZooKeeper中读取主题元数据信息及指定的有效代理，根据分区副本分配算法重新计算指定主题的分区副本分配方案。</p>
+
+  <p class="zw">生成分区分配方案的命令执行后在控制台输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Current partition replica assignment
+
+{"version":1,"partitions":[{"topic":"reassign-partitions","partition":0,"replicas":
+[1]},{"topic":"reassign-partitions","partition":1,"replicas":[2]},{"topic":
+"reassign-partitions","partition":2,"replicas":[3]}]}
+Proposed partition reassignment configuration
+
+{"version":1,"partitions":[{"topic":"reassign-partitions","partition":0,"replicas":
+[1]},{"topic":"reassign-partitions","partition":1,"replicas":[3]},{"topic":
+"reassign-partitions","partition":2,"replicas":[1]}]}</code></pre>
+
+  <p class="zw">以上信息包括两部分：当前分区分配信息以及根据指定的代理列表生成的分区分配方案。Kafka推荐的分配方案已将3个分区分别分配到brokerId为1和3的两节点上。将Kafka生成的分区重分配方案信息复制到$KAFKA_HOME/config目录下partitions-reassignment.json文件中，新的分区分配方案如代码清单5-4所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-4　partitions-reassignment.json文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{"version":1,"partitions":[{"topic":"reassign-partitions","partition":0,"replicas":
+[1]},{"topic":"reassign-partitions","partition":1,"replicas":[3]},{"topic":
+"reassign-partitions","partition":2,"replicas":[1]}]}</code></pre>
+
+  <p class="zw">（2）执行分区迁移。通过步骤1生成了分区新的分配方案，执行以下命令对指定主题的分区进行迁移：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--reassignment-json-file  ../config/partitions-reassignment.json  --execute</code></pre>
+
+  <p class="zw">该命令的各个参数说明如下。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">zookeeper：指定ZooKeeper地址，该命令会将新的分区分配方案信息写入ZooKeeper相应节点。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">reassignment-json-file：指定分区分配方案的文件路径，该分配文件是以JSON格式指定各分区对应的brokerId列表。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">execute：指定该命令操作类型为执行分区迁移。</li>
+  </ul>
+
+  <p class="zw">分区迁移的基本原理是在目标节点上创建分区目录，然后复制原分区数据到目标节点，最后删除原节点的数据，因此在迁移时要确保目标节点有足够的空间。</p>
+
+  <p class="zw">（3）查看分区迁移进度。执行以下命令查看分区迁移的进度：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--reassignment-json-file  ../config/partitions-reassignment.json  --verify</code></pre>
+
+  <p class="zw">输出信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Status of partition reassignment: 
+Reassignment of partition [reassign-partitions,0] completed successfully
+Reassignment of partition [reassign-partitions,1] completed successfully
+Reassignment of partition [reassign-partitions,2] completed successfully</code></pre>
+
+  <p class="zw">从分区迁移进度信息可知：3个分区已完成迁移（completed successfully），若分区还正在迁移中，则状态为in progress。分区迁移一旦开始即无法停止，更不要强行停止集群，否则会造成数据不一致，带来意想不到的后果，因此设置合理的文件保留时间是很有必要的，这样在数据迁移时要迁移的数据量就相对较小。</p>
+
+  <p class="zw">（4）查看分区分配信息。再次执行查看该主题分区副本分布信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:reassign-partitions  PartitionCount:3  ReplicationFactor:1  Configs:
+Topic: reassign-partitions Partition: 0 Leader: 1    Replicas: 1  Isr: 1
+Topic: reassign-partitions Partition: 1 Leader: 3    Replicas: 3  Isr: 3
+Topic: reassign-partitions Partition: 2 Leader: 1    Replicas: 1  Isr: 1</code></pre>
+
+  <p class="zw">从分区分配信息可知，已按照分区重分配方案完成了分区迁移。在以上操作步骤中执行分区迁移（execute）时并没有对数据复制流量进行限制，在数据量比较大时对复制流量的限制会在一定程度上减少数据迁移操作时对其他操作带来的影响，进而保证集群的稳定。</p>
+
+  <h4 class="sigil_not_in_toc1">2．集群扩容数据迁移</h4>
+
+  <p class="zw">上一节通过下线brokerId为2的节点介绍了分区数据迁移的基本步骤，本小节通过将该节点恢复加入集群来模拟集群扩容，在介绍集群扩容数据迁移基本操作时先介绍复制限流控制的相关操作。</p>
+
+  <p class="zw">首先执行生成分区重分配方案的命令，生成的分区重分配方案信息如代码清单5-5所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-5　集群扩容操作的分区重分配方案</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{"version":1,"partitions":[{"topic":"reassign-partitions","partition":0,"replicas":
+[1]},{"topic":"reassign-partitions","partition":1,"replicas":[2]},{"topic":
+"reassign-partitions","partition":2,"replicas":[3]}]}</code></pre>
+
+  <p class="zw">分区迁移时复制限流有两种方法：一是通过动态修改配置，二是通过kafka-reassign- partitions.sh脚本支持的throttle参数设置。</p>
+
+  <p class="zw">（1）动态配置限流。通过动态配置方式限流时，在复制过程中并没有相应的日志信息显示已限流，因此为了展示动态配置限流的效果，我们首先增加分区的数据量，然后通过查看分区迁移进度与不限流之前进度状态的对比，来验证限流是否生效。当将复制流量限制在一个比较小的数字时，分区迁移过程将变慢，查看迁移进度时在一个时间范围内会出现正在迁移的状态（in progress）。</p>
+
+  <p class="zw">这里再介绍Kafka自带的另一个用于生成测试数据的脚本kafka-verifiable-producer.sh，该脚本用于向指定主题发送自增整型数字消息。执行以下命令生成10万条消息。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-verifiable-producer.sh --broker-list server-1:9092,server-2:9092,server
+-3:9092 --topic reassign-partitions --max-message 100000</code></pre>
+
+  <p class="zw">参数max-message用于指定要发送的消息总数。然后按以下步骤设置数据复制时限流配置。</p>
+
+  <p class="zw">设置数据复制被限流的副本列表：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-configs.sh --zookeeper server-1:2181,server-1:2181,server-1:2181 
+--entity-type topics --entity-name reassign-partitions --alter --add-config 
+leader.replication.throttled.replicas=[0:1,1:2,2:3],follower.replication.
+throttled.replicas=[0:1,1:2,2:3]</code></pre>
+
+  <p class="zw">设置brokerId为2的节点复制速率为1KB/s：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-configs.sh --zookeeper server-1:2181,server-1:2181,server-1:2181 
+--entity-type brokers --entity-name 2 --alter --add-config 
+follower.replication.throttled.rate=100,leader.replication.throttled.rate=1024</code></pre>
+
+  <p class="zw">通过ZooKeeper客户端查看该节点配置信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 34] get /config/brokers/2                 
+{"version":1,"config":{"leader.replication.throttled.rate":"1024","follower.
+replication.throttled.rate":"1024"}}</code></pre>
+
+  <p class="zw">执行分区迁移后，查看迁移进度信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Status of partition reassignment: 
+Reassignment of partition [reassign-partitions,0] completed successfully
+Reassignment of partition [reassign-partitions,1] is still in progress
+Reassignment of partition [reassign-partitions,2] completed successfully</code></pre>
+
+  <p class="zw">分区迁移进度表明，brokerId为2的节点限流之后，复制进度明显变慢。若设置的限流值过于偏小导致复制速度很慢，多次查看分区迁移进度一直处于迁移中的状态时，可以通过动态修改限流配置增大限流值。需要注意的是，在分区迁移时应多次运行查看迁移进度的命令（verify），以确保分区迁移完成，同时通过该命令将限流配置移除。本例分区迁移完成后执行该命令输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Status of partition reassignment: 
+Reassignment of partition [reassign-partitions,0] completed successfully
+Reassignment of partition [reassign-partitions,1] completed successfully
+Reassignment of partition [reassign-partitions,2] completed successfully
+Throttle was removed.</code></pre>
+
+  <p class="zw">由分区迁移进度状态信息可知：各分区迁移已完成，同时限额配置已被移除。此时再通过ZooKeeper客户端查看该主题及节点所设置的动态配置信息，可以看到相应的配置信息均已被删除。</p>
+
+  <p class="zw">（2）throttle设置限流。分区迁移脚本提供了参数throttle用于设置限流值。例如，设置迁移时数据复制速率为1 KB/s，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--reassignment-json-file  ../config/partitions-reassignment.json  --execute  
+--throttle 1024</code></pre>
+
+  <p class="zw">在输出信息中有以下两条信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Warning: You must run Verify periodically, until the reassignment completes, to ensure 
+the throttle is removed. You can also alter the throttle by rerunning the Execute 
+command passing a new value.
+The throttle limit was set to 1024 B/s</code></pre>
+
+  <p class="zw">警告信息提示：需要执行验证迁移进度命令，以确保限流设置被移除。如果迁移过程比较缓慢，可以调整限额值再次执行迁移命令。最后一行显示了当前所设置的限额值。</p>
+
+  <h3 id="nav_point_127" class="calibre9">5.6.3　增加分区</h3>
+
+  <p class="zw">当前版本的Kafka并不支持减少分区的操作，也就是说，只能对一个主题执行增加分区的操作，Kafka自带的kafka-topics.sh脚本可以很方便地对某个主题的分区数进行修改。</p>
+
+  <p class="zw">为了介绍分区及副本数变化的操作，我们创建一个名为“partition-replica-foo”主题，该主题有3个分区、1个副本，创建该主题命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--replication-factor 1 --partitions 3 --topic partition-replica-foo</code></pre>
+
+  <p class="zw">登录ZooKeeper客户端查看该主题的分区元数据信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 2] ls /brokers/topics/ 
+partition-replica-foo/partitions
+[0, 1, 2]</code></pre>
+
+  <p class="zw">可以看到主题当前有3个分区，现在将分区数修改为6，执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --alter --zookeeper server-1:2181,server-2:2181,server-3:2181  
+--partitions 6 --topic partition-replica-foo</code></pre>
+
+  <p class="zw">再次查看该主题分区元数据信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 6] ls /brokers/topics/ 
+partition-replica-foo/partitions         
+[0, 1, 2, 3, 4, 5]</code></pre>
+
+  <p class="zw">由当前分区信息可知：该主题分区数已成功扩展为6个。向该主题发送一批数据（这里测试时发送1～10的数字），通过kafka-run-class.sh脚本调用kafka.tools.DumpLogSegments查看消息内容，新增的分区能够正常接收到消息。例如，查看编号为5的分区存储的消息内容，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-run-class.sh kafka.tools.DumpLogSegments --files /opt/data/kafka- 
+logs/partition-replica-foo-5/00000000000000000000.log  --print-data-log</code></pre>
+
+  <p class="zw">该分区存储的消息内容如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">offset: 0 position: 0 CreateTime: 1490746340519 isvalid: true payloadsize: 1 magic: 
+1 compresscodec: NoCompressionCodec crc: 442199113 payload: 4
+offset: 1 position: 35 CreateTime: 1490746347162 isvalid: true payloadsize: 2 magic: 
+1 compresscodec: NoCompressionCodec crc: 4005880382 payload: 10</code></pre>
+
+  <h3 id="nav_point_128" class="calibre9">5.6.4　增加副本</h3>
+
+  <p class="zw">前一小节创建的主题有6个分区、1个副本，本小节介绍如何将该主题的副本数修改为2。</p>
+
+  <p class="zw">首先查看该主题分区副本分布情况，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --describe --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--topic partition-replica-foo</code></pre>
+
+  <p class="zw">该主题分区副本分布信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic: partition-replica-foo  PartitionCount:6  ReplicationFactor:1  Configs:
+Topic: partition-replica-foo  Partition: 0  Leader: 1    Replicas: 1 Isr: 1
+Topic: partition-replica-foo  Partition: 1  Leader: 2    Replicas: 2 Isr: 2
+Topic: partition-replica-foo  Partition: 2  Leader: 3    Replicas: 3 Isr: 3
+Topic: partition-replica-foo  Partition: 3  Leader: 1    Replicas: 1 Isr: 1
+Topic: partition-replica-foo  Partition: 4  Leader: 2    Replicas: 2 Isr: 2
+Topic: partition-replica-foo  Partition: 5  Leader: 3    Replicas: 3 Isr: 3</code></pre>
+
+  <p class="zw">将3个节点依次记为B1～B3，6个分区依次记为P0～P5，由该主题当前分区副本分配信息可知，该主题第一个分区即P0分布在B1上，即对应brokerId列表数组的第0个位置，根据第4章的副本分配算法可知由于起始shift为0，由firstReplicaIndex+shift=0，可得firstReplicaIndex为0，当修改副本数为2后，根据副本分配算法得到新的分区副本分布情况如表5-6所示。这里根据副本分配算法来确定新的副本分布情况，当然也可以不采用该算法进行分配，只要保证各副本均匀分布在所有节点即可。</p>
+
+  <p class="biao_ti">表5-6　分区副本分布</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">轮次</td>
+
+        <td class="calibre16">B1</td>
+
+        <td class="calibre16">B2</td>
+
+        <td class="calibre16">B3</td>
+
+        <td class="calibre16">shift</td>
+
+        <td class="calibre16">firstReplicaIndex+shift</td>
+      </tr>
+
+      <tr class="calibre17">
+        <td rowspan="2" class="calibre16">第一轮</td>
+
+        <td class="calibre16">P0</td>
+
+        <td class="calibre16">P1</td>
+
+        <td class="calibre16">P2</td>
+
+        <td class="calibre16">0</td>
+
+        <td class="calibre16">0</td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">P3</td>
+
+        <td class="calibre16">P4</td>
+
+        <td class="calibre16">P5</td>
+
+        <td class="calibre16">1</td>
+
+        <td class="calibre16">1</td>
+      </tr>
+
+      <tr class="calibre17">
+        <td rowspan="4" class="calibre16">第二轮</td>
+
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+
+        <td class="calibre16">P0</td>
+
+        <td class="calibre16">P1</td>
+
+        <td rowspan="4" class="calibre16">1</td>
+
+        <td rowspan="4" class="calibre16">1</td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">P2</td>
+
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+
+        <td class="calibre16">P3</td>
+
+        <td class="calibre16">P4</td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">P5</td>
+
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+
+        <td class="calibre16">
+          <p class="zw"/>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">根据表5-6副本分布信息，创建一个JSON格式文件，该文件内容为该主题对应每个分区副本列表。若这里指定该文件名为replica-extends.json，则该文件内容如代码清单5-6所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单5-6　replica-extends.json文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{
+   "version": 1,
+   "partitions": [
+      {
+         "topic": "partition-replica-foo",
+         "partition": 0,
+         "replicas": [
+            1,
+            2
+         ]
+      },
+      {
+         "topic": "partition-replica-foo",
+         "partition": 1,
+         "replicas": [
+            2,
+            3
+         ]
+      },
+      {
+         "topic": "partition-replica-foo",
+         "partition": 2,
+         "replicas": [
+            3,
+            1
+         ]
+      },
+      {
+         "topic": "partition-replica-foo",
+         "partition": 3,
+         "replicas": [
+            1,
+            2
+         ]
+      },
+      {
+         "topic": "partition-replica-foo",
+         "partition": 4,
+         "replicas": [
+            2,
+            3
+         ]
+      },
+      {
+         "topic": "partition-replica-foo",
+         "partition": 5,
+         "replicas": [
+            3,
+            1
+         ]
+      }
+   ]
+}</code></pre>
+
+  <p class="zw">执行分区副本重分配命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--reassignment-json-file  ../config/replica-extends.json  --execute</code></pre>
+
+  <p class="zw">查看分区副本重分配执行状态：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-reassign-partitions.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--reassignment-json-file  ../config/replica-extends.json  --verify</code></pre>
+
+  <p class="zw">分区副本重分配执行状态输出：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Status of partition reassignment: 
+Reassignment of partition [partition-replica-foo,3] completed successfully
+Reassignment of partition [partition-replica-foo,4] completed successfully
+Reassignment of partition [partition-replica-foo,5] completed successfully
+Reassignment of partition [partition-replica-foo,1] completed successfully
+Reassignment of partition [partition-replica-foo,0] completed successfully
+Reassignment of partition [partition-replica-foo,2] completed successfully</code></pre>
+
+  <p class="zw">该主题副本扩展后，分区副本分布情况如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic: partition-replica-foo  Partition: 0  Leader: 1  Replicas: 1,2  Isr: 1,2
+Topic: partition-replica-foo  Partition: 1  Leader: 2  Replicas: 2,3  Isr: 2,3
+Topic: partition-replica-foo  Partition: 2  Leader: 3  Replicas: 3,1  Isr: 3,1
+Topic: partition-replica-foo  Partition: 3  Leader: 1  Replicas: 1,2  Isr: 1,2
+Topic: partition-replica-foo  Partition: 4  Leader: 2  Replicas: 2,3  Isr: 2,3
+Topic: partition-replica-foo  Partition: 5  Leader: 3  Replicas: 3,1  Isr: 3,1</code></pre>
+
+  <p class="zw">至此，增加副本的相关操作介绍完毕。其实，增加副本操作是分区迁移的一个特例，本质也是分区副本的重分配操作。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0008_split_005.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0008_split_007.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

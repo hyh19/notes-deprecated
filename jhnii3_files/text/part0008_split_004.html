@@ -1,0 +1,1176 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0008_split_003.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0008_split_005.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_115" class="sigil_not_in_toc">5.4　消费者基本操作</h2>
+
+  <p class="zw">Kafka也自带了对消费者进行操作的相关脚本，本节将详细介绍每个脚本的作用及用法。</p>
+
+  <h3 id="nav_point_116" class="calibre9">5.4.1　消费消息</h3>
+
+  <p class="zw">Kafka的消费者以Pull的方式获取消息，同时Kafka采用了消费组的模式，每个消费者都属于某一个消费组。在创建消费者时，若不指定消费者的groupId，则该消费者属于默认消费组。消费组是一个全局的概念，因此在设置group.id时，要确保该值在Kafka集群中唯一。</p>
+
+  <p class="zw">同一个消费组下的各消费者在消费消息时是互斥的，也就是说，对于一条消息而言，就同一个消费组下的消费者来讲，只能被同组下的某一个消费者消费，但不同消费组的消费者能消费同一条消息，正因如此，我们很方便通过消费组来实现消息的单播与广播。这里所说的单播与广播是相对消费者消费消息而言的。</p>
+
+  <p class="zw">Kafka提供了一个kafka-console-consumer.sh脚本以方便用户在终端模拟消费者消费消息，该脚本内容如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">exec $(dirname $0)/kafka-run-class.sh kafka.tools.ConsoleConsumer "$@"</code></pre>
+
+  <p class="zw">该脚本调用的是Kafka core工程下kafka.tools包下的ConsoleConsumer对象，该对象根据运行时参数不同，分别调用Kafka老版本的消费者和新版本的消费者（org.apache.kafka.clients. consumer.KafkaConsumer）消费消息。</p>
+
+  <h4 class="sigil_not_in_toc1">1．旧版高级消费者</h4>
+
+  <p class="zw">kafka-console-consumer.sh脚本通过运行时指定连接Kafka的方式来区分调用哪个版本的消费者。若在运行脚本时指定zookeeper参数，则调用的是旧版高级消费者（kafka.consumer.Zoo Keeper ConsumerConnector）。进入$KAFKA_HOME/bin目录下执行以下命令启动一个老版本的消费者。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">./kafka-console-consumer.sh --zookeeper server-1:2181,server-2:2181,server-2:2181 
+--topic kafka-action --consumer-property group.id=old-consumer-test --consumer-property 
+consumer.id=old-consumer-c1 --from-beginning --delete-consumer-offsets</code></pre>
+
+  <p class="zw">以上启动消费者命令的各参数说明如下。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">zookeeper参数用于指定连接Kafka的ZooKeeper地址设置。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">topic参数指定消费者消费的主题。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">consumer-property参数后面以键值对的形式指定消费者级别的配置。例如，在启动消费者时可以通过配置group.id设置消费组名，若不设置该值，执行该脚本时会随机创建一个以“console-consumer-”为前缀，之后连接一个100000以内的随机整数组成字符串作为消费组名；通过consumer.id设置消费者的Id，启动一个旧版高级消费者会在ZooKeeper中注册该消费者的Id，在ZooKeeper中会创建一个以${group.id}_${consumer.id}的节点，若不指定consumer.id，启动消费者时会创建一个以代理的hostname-当前时间戳-UUID前8位字符构成的字符串作为consumer.id。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">from-beginning参数设置从消息起始位置开始消费。默认是从最新消息位置（latest）开始消费。执行该脚本时老版本的消费者并不支持--offset参数，也就是说，使用老版本消费者时只能指定是从消息起始位置还是最新消息位置，而不能指定从任意偏移量开始消费。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">delete-consumer-offsets参数用于删除在ZooKeeper中记录的已消费的偏移量。假设有多个消费者属于该消费组，则再创建一个属于该消费组的消费者时若指定了from-beginning参数，则必须指定该参数，以删除其他消费者在ZooKeeper中记录的已被消费的最大偏移量，因为对一条消息而言，只能被同一个消费组下的某一个消费者消费。之所以在这里使用该参数是希望向读者介绍该参数的用法，但在实际应用中很少会在创建新的消费者时删除已被消费提交的偏移量。</li>
+  </ul>
+
+  <p class="zw">旧版消费者默认将消费偏移量保存到ZooKeeper中，可以通过offsets.storage进行设置，若指定offsets.storage=kafka则将偏移量保存到Kafka内部主题中，若设置offsets.storage=zookeeper则将偏移量保存到ZooKeeper中。当offfset.storage=kafka时还可以通过配置项dual.commit. enabled=true设置同时将偏移量保存到ZooKeeper中。启动一个旧版消费者在ZooKeeper中对应元数据的目录结构如图5-5所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00093.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-5　消费者在ZooKeeper中元数据目录结构</p>
+
+  <p class="zw">每个消费者被创建时都会向ZooKeeper中注册相应的元数据信息，若该消费者所属的消费组在ZooKeeper中不存在，则首先在/consumers目录下创建一个名为${group.id}的节点，即消费组节点，并创建3个子节点。3个节点名及作用描述如表5-4所示。</p>
+
+  <p class="biao_ti">表5-4　消费组子节点说明</p>
+
+  <table border="1" width="90%" class="calibre11">
+    <thead class="calibre12">
+      <tr class="calibre13">
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">节　点　名</p>
+        </th>
+
+        <th class="calibre14">
+          <p class="biao_tou_dan_yuan_ge">用　　途</p>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody class="calibre15">
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">ids</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">记录该消费组下正在运行的消费者列表</p>
+        </td>
+      </tr>
+
+      <tr class="calibre17">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">owners</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">记录该消费组消费的主题列表</p>
+        </td>
+      </tr>
+
+      <tr class="calibre13">
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">offsets</p>
+        </td>
+
+        <td class="calibre16">
+          <p class="biao_tou_dan_yuan_ge">记录该消费组下每个消费者所消费主题的各个分区的偏移量，若在启动消费者时指定offsets.storage=kafka则偏移量会保存到Kafka内部主题中，就不会有该节点</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="zw">一个新的消费者被创建时会在ZooKeeper中与之对应的消费组节点的ids子节点下注册一个临时节点，该临时节点名为${group.id}_${consumer.id}，当消费者退出时该节点就会被删除。当消费者发生变化时，通过ZooKeeper的Watch机制感知消费者的变化，从而进行消费者平衡操作，根据分区分配策略重新分配每个消费者消费的分区。</p>
+
+  <p class="zw">在ZooKeeper客户端查看该消费组ids节点信息，执行命令及输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 91] ls /consumers/ 
+old-consumer-test/ids
+[old-consumer-test_old-consumer-c1]</code></pre>
+
+  <p class="zw">同时，通过get命令查看old-consumer-test_old-consumer-c1节点存储的元数据信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{"version":1,"subscription":{"kafka-action":1},"pattern":"white_list","timestamp":
+"1489024110802"}</code></pre>
+
+  <p class="zw">其中version为固定值1；subscription记录该消费者订阅的主题列表及每个主题对应的消费者线程数，本例表示订阅的主题名为“kafka-action”，有一个线程在消费；pattern目前支持white_list、black_list和static这3个取值，Kafka提供了按主题分组统计的功能（TopicCount），根据pattern的取值分别实例化不同的TopicCount对象；timestamp记录消费者启动时的时间戳。</p>
+
+  <p class="zw">在消费组节点owners子节点中记录该消费组所消费的主题列表以及每个主题的每个分区对应的消费者线程。当主题的元数据信息发生变化时，如分区Leader发生变化时，将触发所有的消费组进行平衡操作。例如，在ZooKeeper客户端执行以下命令查看本例所创建的消息者在owner节点相关信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 100] ls  /consumers/ 
+old-consumer-test/owners</code></pre>
+
+  <p class="zw">输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[kafka-action]</code></pre>
+
+  <p class="zw">查看编号为0的分区对应的消费者线程信息，在ZooKeeper客户端执行命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk:server-1:2181,server-2:2181,server-3:2181(CONNECTED)101]get /consumers/ 
+old-consumer-test/owners/kafka-action/0</code></pre>
+
+  <p class="zw">输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">old-consumer-test_old-consumer-c1-0</code></pre>
+
+  <p class="zw">由于当前消费组只有一个消费者，因此通过以上命令查看某个分区对应的消费者信息均为old-consumer-test<em class="calibre8">old-consumer-c1-0，该信息格式为${group.id}</em>${consumer.id}-消费者线程编号。</p>
+
+  <p class="zw">在offsets子节点记录了该消费组订阅的每个主题的各分区已消费的最大偏移量，要查看本例编号为0的分区已消费的最大偏移量，在ZooKeeper客户端执行命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 118] get 
+/consumers/old-consumer-test/offsets/kafla-actiont/0</code></pre>
+
+  <p class="zw">输出信息如下（省略了ZooKeeper相关信息）：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">5</code></pre>
+
+  <p class="zw">以上输出结果表示该分区的消息已被该消费组（old-consumer-test）的消费者消费的最大偏移量为5。</p>
+
+  <h4 class="sigil_not_in_toc1">2．旧版低级消费者</h4>
+
+  <p class="zw">Kafka自带了一个kafka-simple-consumer-shell.sh脚本，用于调用Kafka的低级消费者（Simple Consumer），该脚本代码如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">exec $(dirname $0)/kafka-run-class.sh kafka.tools.SimpleConsumerShell "$@"</code></pre>
+
+  <p class="zw">该脚本调用kafka.tools.SimpleConsumerShell类，SimpleConsumerShell通过实现Simple Consumer相关的API，简单地将消息输出到终端。低级消费者需要自己管理消费偏移量，同时只能消费某个主题的某个分区的消息，因此当我们执行该脚本启动一个消费者时，该消费者并不会向ZooKeeper注册相应元数据信息。例如，执行以下命令，启动一个消费者，从主题kafka-action编号为0的分区拉取消息。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">./kafka-simple-consumer-shell.sh --broker-list server-1:9092,server-2:9092,server 
+-3:9092 --clientId simple-consumer-test --offset -1 --partition 0 --topic kafka-action</code></pre>
+
+  <p class="zw">该命令部分参数说明如下。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">--broker-list：用于指定代理地址列表。从该参数也可以看出Low-Level消费者并不依赖ZooKeeper。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">--offset：用于指定消费的起始位置。该参数支持任意非负整数，同时支持−1和−2两个负数，分别表示消息起始位置和最新消息的位置，若不指定该参数，默认是−2。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">--partition用于指定分区，若不指定默认是编号为0的分区。</li>
+  </ul>
+
+  <p class="zw">该脚本还支持其他参数，如指定消息格式的formatter参数、指定是从分区的Leader副本消费消息还是从Follower副本消费的replica参数，默认是−1即从Leader副本消费等。</p>
+
+  <h4 class="sigil_not_in_toc1">3．新版本消费者</h4>
+
+  <p class="zw">新版本的消费者（org.apache.kafka.clients.consumer.KafkaConsumer）去掉了对ZooKeeper的依赖，当启动一个消费者时不再向ZooKeeper注册，而是由消费组协调器（GroupCoordinator）统一管理。消费者已消费消息的偏移量提交后会保存到名为“__consumer_offsets”的内部主题中。下面详细介绍如何kafka-console-consumer.sh脚本执行新版本消费者相关操作。</p>
+
+  <p class="zw">首先执行以下命令启动一个新版消费者：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">./kafka-console-consumer.sh --bootstrap-server server-1:9092,server-2:9092, 
+server-3:9092 --new-consumer --consumer-property group.id=new-consumer-test 
+--consumer-property client.id=new-consumer-c1 --topic kafka-action</code></pre>
+
+  <p class="zw">执行该脚本关键参数是bootstrap-server，因为以这种方式连接Kafka时才会调用新版本的KafkaConsumer，若通过参数zookeeper方式启动则调用的是老版本的消费者。同时可以通过new-consumer参数直接指定调用新版本的消费者，若以参数bootstrap-server方式启动，则默认调用的是新版消费者，此时可以不用设置new-consumer参数。以上启动消费者的命令通过参数consumer-property设置group.id为new-consumer-test。通过计算消费组名的hashcode值与内部主题分区总数（默认是50个分区）取模来确定消费者偏移量存储的分区。若没有指定group.id，则消费者属于默认消费组，可以通过以下命令查看消费组名信息。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-groups.sh --bootstrap-server server-1:9092,server-2:9092, server-3:9092  --list --new-consumer</code></pre>
+
+  <p class="zw">其中，参数new-consumer指定列出新消费者类型的所有消费组信息。通过消费组名根据以下公式就可以计算出该消费组已消费的偏移量存储在__consumer_offsets主题对应的分区。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Math.abs(${group.id}.hashCode()) % ${offsets.topic.num.partitions}</code></pre>
+
+  <p class="zw">利用该公式，计算出本例的消费者已消费的偏移量保存在编号为6的分区（Math.abs ("new-consumer-test".hashCode()) % 50=6）。可以通过以下几种方式来验证。</p>
+
+  <p class="zw">（1）查看主题kafka-action各分区的偏移量信息，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list server-1:9092,server 
+-2:9092,server-3:9092 --topic kafka-action -time -1</code></pre>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-action:2:14
+kafka-action:1:12
+kafka-action:0:11</code></pre>
+
+  <p class="zw">（2）查看__consumer_offsets主题编号为6的分区的信息。执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-simple-consumer-shell.sh --topic __consumer_offsets --partition 6 
+--broker-list server-1:9092,server-2:9092,server-3:9092 --formatter 
+"kafka.coordinator.GroupMetadataManager\$OffsetsMessageFormatter"</code></pre>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[new-consumer-test,kafka-action,0]::[OffsetMetadata[11,NO_METADATA],CommitTime 
+1489143903365,ExpirationTime 1489230303365]
+[new-consumer-test,kafka-action,1]::[OffsetMetadata[12,NO_METADATA],CommitTime 
+1489143903365,ExpirationTime 1489230303365]
+[new-consumer-test,kafka-action,2]::[OffsetMetadata[14,NO_METADATA],CommitTime 
+1489143903365,ExpirationTime 1489230303365]</code></pre>
+
+  <p class="zw">可以看到，编号为6的分区中记录了该消费组已消费的偏移量，各分区记录的偏移量信息与方式1中展示的信息一致。</p>
+
+  <h4 class="sigil_not_in_toc1">4．消费多主题</h4>
+
+  <p class="zw">Kafka自带脚本kafka-console-consumer.sh的topic参数并不支持同时指定多个主题，但该脚本提供了另外一个参数whitelist（白名单），该参数可同时指定多个主题，且支持正则表达式。注意，主题名表达式需要加引号。例如，执行以下命令，指定消费kafka-action和producer-perf-test两个主题的消息。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-consumer.sh --bootstrap-server server-1:9092,server-2:9092, 
+server-3:9092  --new-consumer --consumer-property group.id=consume-multi-topic 
+--whitelist "kafka-action|producer-perf-test"</code></pre>
+
+  <p class="zw">然后启动两个生产者，分别向kafka-action和producer-perf-test两个主题发送消息，此时在终端可以看到消费者消费到两个主题的消息，测试结果如图5-6所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00094.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-6　消费多主题的测试结果</p>
+
+  <h3 id="nav_point_117" class="calibre9">5.4.2　单播与多播</h3>
+
+  <p class="zw">Kafka引入了消费组，每个消费者都属于一个特定的消费组，通过消费组就可以实现消息的单播与多播。本节详细介绍消息单播与多播的具体实现方式。</p>
+
+  <h4 class="sigil_not_in_toc1">1．单播</h4>
+
+  <p class="zw">一条消息只能被某一个消费者消费的模式称为单播。要实现消息单播，只要让这些消费者属于同一个消费组即可。下面通过一个简单实例介绍在终端模拟消息单播操作流程。</p>
+
+  <p class="zw">首先启动一个生产者向kafka-action主题发送消息，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-producer.sh --broker-list server-1:9092,server-2:9092,server-3:9092 
+--topic kafka-action</code></pre>
+
+  <p class="zw">在终端分别执行以下命令，启动两个消费者：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-consumer.sh --bootstrap-server server-1:9092,server-2:9092,server- 
+3:9092 --new-consumer --topic kafka-action --consumer-property group.id=single
+-consumer-group</code></pre>
+
+  <p class="zw">当生产者发送一条消息时，两个消费者中只有一个能收到信息，运行结果如图5-7所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00095.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-7　单播测试结果</p>
+
+  <h4 class="sigil_not_in_toc1">2．多播</h4>
+
+  <p class="zw">一条消息能够被多个消费者消费的模式称为多播。之所以不称之为广播，是因为一条消息只能被Kafka同一个分组下某一个消费者消费，而不是所有消费者都能消费，所以从严格意义上来讲并不能算是广播模式，当然如果希望实现广播模式只要保证每个消费者均属于不同的消费组。针对Kafka同一条消息只能被同一个消费组下的某一个消费者消费的特性，要实现多播只要保证这些消费者属于不同的消费组即可。例如，我们再增加一个消费者，该消费者属于multi-consumer-group消费组，命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-consumer.sh --bootstrap-server 
+server-1:9092,server-2:9092,server-3:9092 --new-consumer --topic kafka-action 
+--consumer-property group.id=multi-consumer-group</code></pre>
+
+  <p class="zw">然后通过生产者发送几条消息，可以看到不同消费组的消费者同时能消费到消息，然而同一个消费组下的消费者却只能有一个消费者能消费到消息，运行结果如图5-8所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00096.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-8　多播测试结果</p>
+
+  <h3 id="nav_point_118" class="calibre9">5.4.3　查看消费偏移量</h3>
+
+  <p class="zw">Kafka提供了一个查看某个消费组消费者消费偏移量的kafka-consumer-offset-checker.sh脚本。通过该脚本可以查看某个消费组消费消息的情况，该脚本调用的是kafka.tools.Consumer OffsetChecker，不过在0.9版本之后已不再建议使用该脚本，而建议使用kafka-consumer-groups.sh，该脚本调用的是kafka.admin.ConsumerGroupCommand。下面分别介绍通过这两个脚本查看消费偏移量的用法。</p>
+
+  <h4 class="sigil_not_in_toc1">1．ConsumerOffsetChecker用法</h4>
+
+  <p class="zw">ConsumerOffsetChecker底层调用的是SimpleConsumer来获取相关的消费信息。首先执行以下命令，启动一个新版本的消费者，该消费者消费主题kafka-action的消息，同时该消费者隶属于消费组consumer-offset-test。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-console-consumer.sh --bootstrap-server server-1:9092,server-2:9092, 
+server-3:9092 --new-consumer --topic kafka-action --consumer-property 
+group.id=consumer-offset-test</code></pre>
+
+  <p class="zw">执行以下命令查看消费组consumer-offset-test对主题kafka-action消费情况：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-offset-checker.sh --zookeeper server-1:2181,server-2:2181, 
+server-3:2181 --topic kafka-action --group consumer-offset-test --broker-info</code></pre>
+
+  <p class="zw">其中参数zookeeper和group是必传参数，支持同时查看多个主题，多个主题之间以逗号分隔，不指定主题，则默认查看该消费组消费的所有主题。broker-info是可选参数，打印出各代理信息。</p>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Group                Topic          Pid     Offset     logSize    Lag    Owner
+consumer-offset-test kafka-action   0       30         30         0      none
+consumer-offset-test kafka-action   1       28         28         0      none
+consumer-offset-test kafka-action   2       32         32         0      none
+BROKER INFO
+2 -&gt; 172.117.12.62:9092
+1 -&gt; 172.117.12.61:9092
+3 -&gt; 172.117.12.63:9092</code></pre>
+
+  <p class="zw">输出信息展示了该消费组对所订阅的主题各分区消费情况，包括消费组名（Group）、主题名（Topic）、分区编号（Pid）、已提交的最大消费偏移量（Offset）、消息最大偏移量（logSize）、消费者未消费或是已消费但还未提交而落后于消息偏移量的剩余量（Lag）、消费组所属于的用户（Owner）。同时打印出代理信息，即broker.id与代理地址的映射关系。</p>
+
+  <h4 class="sigil_not_in_toc1">2．ConsumerGroupCommand用法</h4>
+
+  <p class="zw">kafka-consumer-groups.sh脚本调用的是ConsumerGroupCommand类。该脚本支持--zookeeper和--bootstrap-server两种运行方式，支持以下3种类型的操作。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">list：返回与启动方式对应的所有消费组，即若是以参数zookeeper方式启动，则返回的是老版本的消费者对应的消费组信息，否则返回新版本的消费者隶属的消费组信息。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">describe：查看某个消费组当前的消费情况。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">delete：删除消费组。</li>
+  </ul>
+
+  <p class="zw">list类型的操作在上一小节其实已应用过，在此不再介绍。接下来我们首先介绍describe类型的操作。describe用于查看消费组当前的消费情况，若待查看的消费组是以老版本方式创建的，则通过该脚本查看消费情况时应该以--zoookeeper方式运行。以--zookeeper方式运行时，其实现原理即通过查询老版本的消费者在ZooKeeper中记录的相应的元数据信息。反之，若查看的是新消费者的消费情况，则应以--bootstrap-server方式运行该脚本。若消费组是通过新消费者方式创建，新版本的消费者不依赖于ZooKeeper，而运行该脚本时却是通过ZooKeeper方式执行，这样由于在ZooKeeper中查询不到相应的元数据信息，而导致不会返回任何消费信息。</p>
+
+  <p class="zw">本例待查看的消费者为新版本的消费者，因此执行以下命令查看该消费组消费情况：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-groups.sh --bootstrap-server 
+server-1:9092,server-2:9092,server-3:9092 --describe --group consumer-offset-test 
+--new-consumer</code></pre>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">GROUP                TOPIC        PARTITION  CURRENT-OFFSET LOG-END-OFFSET  LAG OWNER
+consumer-offset-test kafka-action 0         29          29  0  consumer-1_/172.117.12.61
+consumer-offset-test kafka-action 1         28          28  0  consumer-1_/172.117.12.61
+consumer-offset-test kafka-action 2         31          31  0  consumer-1_/172.117.12.61</code></pre>
+
+  <p class="zw">同时，若是以bootstrap-server方式运行该脚本时，只能查看运行着的消费组，若消费组状态为“Dead”，则由于在Metadata中查询不到相应元数据信息而导致不会返回任何消费信息，此时会在终端输出以下提示信息，Kafka认为消费者正在进行平衡操作：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Consumer group `consumer-offset-test` is rebalancing.</code></pre>
+
+  <p class="zw">因此，若在查询消费组消费信息时出现以上提示信息，有一种可能是消费者已处于非正常运行状态，有可能消费者正在进行平衡操作。</p>
+
+  <p class="zw">该脚本支持删除不包括任何消费者的消费组。需要注意的是，该脚本只能删除消费组为老版本消费者对应的消费组。我们可以指定删除某个主题的消费组，也可以不指定主题。当然也可以不指定消费组而指定主题，此时删除该主题下的所有不具有消费者的消费组。删除操作的本质是删除ZooKeeper中相应消费组的节点及其子节点。</p>
+
+  <p class="zw">首先执行以下命令，查看消息组信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-groups.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 --list</code></pre>
+
+  <p class="zw">输出为：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">old-consumer-test</code></pre>
+
+  <p class="zw">登录ZooKeeper客户端查看该消费组节点信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181,server-2:2181,server-3:2181(CONNECTED) 12] ls /consumers/ 
+old-consumer-test/ids
+[]</code></pre>
+
+  <p class="zw">由该消费组在ZooKeeper中元数据信息可知，该消费组下没有任何消费者，因此执行以下命令该消费组将被成功删除。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-groups.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 
+--delete --group old-consumer-test</code></pre>
+
+  <p class="zw">该命令执行后输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Deleted all consumer group information for group old-consumer-test in zookeeper.</code></pre>
+
+  <p class="zw">再次在ZooKeeper客户端查看Kafka元数据信息，发现该消费组相应的节点已被删除。</p>
+
+  <h3 id="nav_point_119" class="calibre9">5.4.4　消费者性能测试工具</h3>
+
+  <p class="zw">Kafka也提供了对新、老两个版本的消费者性能进行压力测试的脚本kafka-consumer- perf-test.sh。本小节也仅介绍该脚本的相关用法，而不给出消费者性能压力测试的完整报告。</p>
+
+  <p class="zw">与消费者相关操作的其他脚本一样，该脚本也是通过运行时所指定的连接Kafka的方式来确定调用哪个版本的消费者。该脚本支持多线程（--threads参数）设置，例如，以broker-list方式启动该脚本，并指定5个线程，消费100万条消息，每条消息大小为1000字节（默认为100字节），同时指定num-fetch-threads为2，默认是1个线程，消费的主题为“producer-perf-test”。该主题在生产者性能测试时已写入了超过100万条消息，其他参数不再设置（在实际压力测试时我是将消费级别的相应配置写在一个consumer.properties文件中，然后通过--consumer.config参数加载该文件），执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-consumer-perf-test.sh --broker-list server-1:9092,server-2:9092,server 
+-3:9092 --threads 5 --messages 1000000 --message-size 1000 --num-fetch-threads 2 
+--group consumer-perf-test --topic producer-perf-test --new-consumer</code></pre>
+
+  <p class="zw">测试结果输出如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec
+2017-03-11 15:31:27:815, 2017-03-11 15:31:33:528, 953.9642, 166.9813, 1000304, 175092.5958</code></pre>
+
+  <p class="zw">测试结果共展示6列信息，依次为运行起始时间、结束时间、消费的消息总量（单位为MB）、按消息总量统计的吞吐量（单位为MB/s）、消费的消息总条数、按消息总数统计的吞吐量（单位为条/s）。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0008_split_003.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0008_split_005.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

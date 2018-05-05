@@ -1,0 +1,1040 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0008_split_001.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0008_split_003.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_105" class="sigil_not_in_toc">5.2　主题管理</h2>
+
+  <p class="zw">Kafka提供了一个kafka-topics.sh工具脚本用于对主题相关的操作，如创建主题、删除主题、修改主题分区数和副本分配以及修改主题级别的配置信息，查看主题信息等操作。该脚本核心代码仅一行：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">exec $(dirname $0)/kafka-run-class.sh kafka.admin.TopicCommand "$@"</code></pre>
+
+  <p class="zw">运行kafka-run-class.sh脚本调用kafka.admin.TopicCommand类，同时接受一个操作类型指令，该指令主要包括--list、--describe、--create、--alter和--delete。</p>
+
+  <p class="zw">读者可以直接运行该脚本以查看该工具所支持的操作及操作命令格式。本节将详细介绍该工具操作命令的具体用法。</p>
+
+  <h3 id="nav_point_106" class="calibre9">5.2.1　创建主题</h3>
+
+  <p class="zw">Kafka提供以下两种方式来创建一个主题。</p>
+
+  <p class="zw">（1）若代理设置了auto.create.topics.enable=true，该配置默认值为true，这样当生产者向一个还未创建的主题发送消息时，会自动创建一个拥有${num.partitions}个分区和${ default. replication.factor}个副本的主题。</p>
+
+  <p class="zw">（2）客户端通过执行kafka-topics.sh脚本创建一个主题。</p>
+
+  <p class="zw">本小节将采用第二种方式来创建主题，第一种方式创建主题将在讲解kafka-console- producer.sh时进行介绍。下面创建一个名称为“kafka-action”的主题，该主题拥有2个副本、3个分区，创建该主题命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181,server-3:2181  
+--replication-factor 2 --partitions 3 --topic kafka-action</code></pre>
+
+  <p class="zw">在控制台执行结果输出如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Created topic "kafka-action".</code></pre>
+
+  <p class="zw">此时会在${log.dir}目录下创建相应的分区文件目录，副本分别分布在不同的节点上，该主题分区目录分布如图5-1所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00089.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图5-1 “kafka-action”在集群中的分布</p>
+
+  <p class="zw">同时登录ZooKeeper客户端查看所创建的主题元数据信息，“kafka-action”元数据信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: server-1:2181(CONNECTED) 54] ls /brokers/topics/kafka-action/partitions
+[0, 1, 2]
+[zk: server-1:2181(CONNECTED) 55] get /brokers/topics/kafka-action
+{"version":1,"partitions":{"2":[3,1],"1":[2,3],"0":[1,2]}}</code></pre>
+
+  <p class="zw">可以看到，该主题有3个分区、2个副本，分别分布在3个节点上。上述创建主题命令各参数说明如下。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">zookeeper参数是必传参数，用于配置Kafka集群与ZooKeeper连接地址，这里并不要求传递${ zookeeper.connect }配置的所有连接地址。为了容错，建议多个ZooKeeper节点的集群至少传递两个ZooKeeper连接配置，多个配置之间以逗号隔开。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">partitions参数用于设置主题分区数，该配置为必传参数。Kafka通过分区分配策略，将一个主题的消息分散到多个分区并分别保存到不同的代理上，以此来提高消息处理的吞吐量。Kafka的生产者和消费者可以采用多线程并行对主题消息进行处理，而每个线程处理的是一个分区的数据，因此分区实际上是Kafka并行处理的基本单位。分区数越多一定程度上会提升消息处理的吞吐量，然而Kafka消息是以追加的形式存储在文件中的，这就意味着分区越多需要打开更多的文件句柄，这样也会带来一定的开销。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">replication-factor参数用来设置主题副本数，该配置也是必传参数。副本会被分布在不同的节点上，副本数不能超过节点数，否则创建主题会失败。例如，3个节点的Kafka集群最多只能有3个副本，若创建主题时指定副本数大于3，则会抛出以下错误提示：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">error while executing topic command : replication factor: 4 larger than available 
+brokers: 3</code></pre>
+
+  <p class="zw">在创建主题时，我们还可以通过config参数来设置主题级别的配置以覆盖默认配置，可以设置多组配置，具体格式为：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">--config config1-name=config1-value --config config2-name=config2-value</code></pre>
+
+  <p class="zw">创建一个名为config-test的主题，设置该主题的max.message.bytes为404800字节，执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --create --zookeeper server-1:2181,server-2:2181 --replication- 
+factor 2 --partitions 3 --topic config-test --config  max.message.bytes=404800</code></pre>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Created topic "config-test".</code></pre>
+
+  <p class="zw">在创建主题时若使用了config参数，则通过ZooKeeper客户端可以在/config/topics节点下查看到该主题所覆盖的配置，相关节点信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: 172.117.12.61:2181(CONNECTED) 67] get /config/topics/config-test
+{"version":1,"config":{"max.message.bytes":"404800"}}</code></pre>
+
+  <p class="zw">关于主题级别的相关配置，读者可参阅Kafka官方网站的说明https://kafka.apache.org/ documentation.html#topic-config。</p>
+
+  <h3 id="nav_point_107" class="calibre9">5.2.2　删除主题</h3>
+
+  <p class="zw">删除Kafka主题，一般有以下两种方式。</p>
+
+  <p class="zw">（1）手动删除各节点${log.dir}目录下该主题分区文件夹，同时登录ZooKeeper客户端删除待删除主题对应的节点，主题元数据保存在/brokers/topics和/config/topics目录下。</p>
+
+  <p class="zw">（2）执行kafka-topics.sh脚本进行删除，若希望通过该脚本彻底删除主题，则需要保证在启动Kafka时所加载的server.properties文件中配置delete.topic.enable=true，该配置默认为false。否则执行该脚本并未真正删除主题，而是在ZooKeeper的/admin/delete_topics目录下创建一个与待删除主题同名的节点，将该主题标记为删除状态。</p>
+
+  <p class="zw">本小节只讲解通过kafka-topics.sh删除主题的操作，如删除主题“kafka-action”的操作命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics  --delete --zookeeper server-1:2181,server-2:2181  --topic kafka-action</code></pre>
+
+  <p class="zw">删除命令执行后，在控制台打印结果信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic kafka-action is marked for deletion.
+Note: This will have no impact if delete.topic.enable is not set to true.</code></pre>
+
+  <p class="zw">从以上执行结果可以分析出：当delete.topic.enable设置为false时，只是标记“kafka-action”为删除状态，主题在${log.dir}目录下对应的分区文件及在ZooKeeper中的相应节点并未被删除，而是在/admin/delete_topics目录下创建一个以待删除主题命名的节点，以作标记。此时若希望彻底删除主题，则需要通过手动删除相应文件及节点。当该配置为true时，则会将该主题对应的所有文件目录及元数据信息删除。</p>
+
+  <h3 id="nav_point_108" class="calibre9">5.2.3　查看主题</h3>
+
+  <p class="zw">Kafka提供了list和describe两个命令方便查看主题信息，其中list参数列出Kafka所有的主题名，describe参数可以查看所有主题或某个特定主题的信息。</p>
+
+  <h4 class="sigil_not_in_toc1">1．查看所有主题</h4>
+
+  <p class="zw">执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --list --zookeeper server-1:2181,server-2:2181</code></pre>
+
+  <p class="zw">输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">config-test
+kafka-action</code></pre>
+
+  <p class="zw">当前Kafka集群有两个主题，主题名分别为“config-test”及“kafka-action”。</p>
+
+  <h4 class="sigil_not_in_toc1">2．查看某个特定主题信息</h4>
+
+  <p class="zw">当执行describe命令时，若指定topic参数则查看特定主题的信息，若不指定topic参数则查看所有主题信息。该命令会按主题名分组显示各主题的信息。执行以下命令查看config-test主题的信息：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --describe --zookeeper server-1:2181,server-2:2181</code></pre>
+
+  <p class="zw">执行结果输出如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:config-test PartitionCount:3 ReplicationFactor:2 Configs:max.message.bytes=404800
+Topic: config-test Partition: 0   Leader: 3  Replicas: 3,1 Isr: 3,1
+Topic: config-test   Partition: 1 Leader: 1  Replicas: 1,2 Isr: 1,2
+Topic: config-test   Partition: 2 Leader: 2  Replicas: 2,3 Isr: 2,3
+Topic:kafka-action   PartitionCount:3 ReplicationFactor:2  Configs:
+Topic: kafka-action  Partition: 0 Leader: 1  Replicas: 1,2 Isr: 1,2
+Topic: kafka-action  Partition: 1 Leader: 2  Replicas: 2,3 Isr: 2,3
+Topic: kafka-action  Partition: 2 Leader: 3  Replicas: 3,1 Isr: 3,1</code></pre>
+
+  <p class="zw">从输出结果可以看到：已按主题分组展示，每组主题信息中第一行分别展示了主题名、该主题分区总数、该主题副本总数、创建主题时通过config参数所设置的配置，从第二行开始按主题分区编号排序，展示每个分区的Leader副本节点、副本列表AR及ISR列表信息。</p>
+
+  <h4 class="sigil_not_in_toc1">3．查看正在同步的主题</h4>
+
+  <p class="zw">通过describe与under-replicated-partitions命令组合使用，可以查看处于“under replicated”状态的分区。处于该状态的主题可能正在进行同步操作，也有可能同步发生异常，即此时所查询到的主题分区的ISR列表长度小于AR列表长度。对于通过该命令查询到的分区要重点监控，因为这可能意味着集群某个代理已失效或者同步速度减慢等。当然，也可以指定topic参数以查询特定主题是否处于“under replicated”状态。执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --describe --zookeeper 172.117.12.61:2181 --under-replicated- 
+partitions  # 查看处于“under replicated”状态的主题</code></pre>
+
+  <h4 class="sigil_not_in_toc1">4．查看没有Leader的分区</h4>
+
+  <p class="zw">通过describe与unavailable-partitions命令组合使用，可以查看没有Leader副本的主题。同样也可以指定topic参数，查看某个特定主题的哪些分区的Leader已不可用。执行命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh  --describe  --zookeeper  server-1:2181,server-2:2181  --unavailable- 
+partitions</code></pre>
+
+  <h4 class="sigil_not_in_toc1">5．查看主题覆盖的配置</h4>
+
+  <p class="zw">通过describe与topics-with-overrides命令组合使用，可以查看主题覆盖了哪些配置。组合使用与只有describe命令的区别在于：topic-with-overrides命令只显示descibe命令执行的第一行信息。同样，也可以指定topic参数查看某个特定主题所覆盖的配置。执行以下命令：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --describe --zookeeper server-1:2181,server-2:2181 --topics-with 
+-overrides # 查看主题所覆盖的配置</code></pre>
+
+  <p class="zw">输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Topic:config-test PartitionCount:3  ReplicationFactor:2 Configs:max.message.bytes=404800</code></pre>
+
+  <h3 id="nav_point_109" class="calibre9">5.2.4　修改主题</h3>
+
+  <p class="zw">当创建一个主题之后，可以通过alter命令对主题进行修改，包括修改主题级别的配置、增加主题分区、修改副本分配方案、修改主题Offset等。下面详细讲解如何通过Kafka的shell脚本对主题进行修改。</p>
+
+  <h4 class="sigil_not_in_toc1">1．修改主题级别配置</h4>
+
+  <p class="zw">在创建主题时，可以通过config参数覆盖主题级别的默认配置，当主题创建后可以通过alter与config参数组合使用，修改或增加新的配置以覆盖相应配置原来的值，或者通过alter与delete-config参数组合使用删除相应配置设置使其恢复默认值。同时Kafka还提供了一个kafka-configs.sh的脚本，专门用来对配置 （这里的配置不单指主题级别的配置）进行操作，在未来的版本中将不再支持alter与config参数组合使用的方式对配置进行操作。在当前版本（0.10.1.1）的Kafka通过alter参数对配置进行操作时会有操作命令已过期并推荐使用kafka- configs.sh脚本的提示信息，虽然这种操作方式已过期，但并未被移除，因此在这里依然对其操作方法进行介绍。下面通过修改主题“config-test”的相关配置来介绍相关命令的具体用法。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">执行以下命令查看config-test主题当前的配置，命令如下：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   kafka-topics.sh --describe --zookeeper server-12181,server-2:2181,server-3:2181  
+   --topics-with-overrides --topic config-test    # 查看主题当前已覆盖的配置</code></pre>
+
+  <p class="zw">　 输出结果如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   Topic:config-test  PartitionCount:3  ReplicationFactor:2 
+   Configs:max.message.bytes=404800</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">修改该max.message.bytes配置使其值为204800，命令如下：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   kafka-topics.sh --alter --zookeeper server-1:2181,server-2:2181,server-3:2181  
+   --topic config-test --config max.message.bytes=204800</code></pre>
+
+  <p class="zw">　 输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   WARNING: Altering topic configuration from this script has been deprecated and may 
+   be removed in future releases. Going forward, please use kafka-configs.sh for this 
+   functionality
+   Updated config for topic "config-test".</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">更新配置成功，同时输出信息提示通过该方式修改主题级别配置的相关命令已过期，在未来的版本该命令将被移除，推荐使用kafka-configs.sh脚本。关于kafka-topics.sh脚本的相关操作在5.5节将有详细介绍。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">覆盖主题“config-test”的segment.bytes大小为200 MB（200<em class="calibre8">1024</em>1024），执行命令如下：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   kafka-topics.sh --alter --zookeeper server-1:2181,server-2:2181,server-3:2181  
+   --topic config-test --config segment.bytes=209715200</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">该命令执行后，通过参数topics-with-overrides查看主题config-test已覆盖的配置信息，相应信息输出结果如下：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   Topic:config-test    PartitionCount:3    ReplicationFactor:2
+   Configs:segment.bytes=209715200,max.message.bytes=204800</code></pre>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">删除配置项segment.bytes的设置，使其值恢复为默认值，操作命令如下：</li>
+  </ul>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   kafka-topics.sh --alter --zookeeper server-1:2181,server-2:2181,server-3:2181  
+   --topic config-test --delete-config segment.bytes</code></pre>
+
+  <p class="zw">　 命令执行之后，再次查看主题config-test已覆盖的配置信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">   Topic:config-test PartitionCount:3 ReplicationFactor:2 Configs:max.message.bytes=204800</code></pre>
+
+  <h4 class="sigil_not_in_toc1">2．增加分区</h4>
+
+  <p class="zw">Kafka并不支持减少分区的操作，我们只能为一个主题增加分区。例如，主题“config-test”目前有3个分区，如果将其分区设置为5个，操作命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --alter --zookeeper server-1:2181,server-2:2181,server-3:2181  
+--topic config-test --partitions 5</code></pre>
+
+  <p class="zw">增加分区命令执行成功后，查看集群各节点${log.dir}目录下所分配的分区目录文件均已成功创建。同时登录ZooKeeper客户端查看分区元数据信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">[zk: 172.117.12.61:2181(CONNECTED) 7] ls /brokers/topics/config-test/partitions
+[0, 1, 2, 3, 4]
+[zk: 172.117.12.61:2181(CONNECTED) 8] get  /brokers/topics/config-test         
+{"version":1,"partitions":{"4":[1,3],"1":[1,2],"0":[3,1],"2":[2,3],"3":[3,2]}}</code></pre>
+
+  <p class="zw">通过以上元数据信息显示，主题config-test分区数已增加到5个，同时各分区副本进行了重新分配。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0008_split_001.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0008_split_003.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

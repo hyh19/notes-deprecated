@@ -1,0 +1,1169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0009_split_004.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0009_split_006.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_155" class="sigil_not_in_toc">6.5　Spring与Kafka整合应用</h2>
+
+  <p class="zw">Spring与Kafka的整合有spring-kafka和spring-integration-kafka两种方式。本书我们只介绍spring-kafka这种方式。</p>
+
+  <p class="zw">进入Spring官方网站，在Spring支持的Projects列表中会看到有一个工程名为“SPRING KAFKA”的项目，点击该项目进入Spring与Kafka集成相关使用指南页面，在该页面会展示Spring与Kafka集成包所支持的Kafka版本，如图6-3所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00121.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图6-3　Spring与Kafka集成版本的对应关系</p>
+
+  <p class="zw">由于本书所使用的Kafka为0.10.1.1版本，因此我们选择spring-kafka为1.1.5.RELEASE版本。在该页面的右上角，会有spring-kafka版本信息以及该版本的使用指南和API。下面通过一个实例来讲解Spring与Kafka整合的具体步骤。</p>
+
+  <p class="zw">假设有这样一个应用场景：将用户对股票的买卖委托发送到Kafka，然后再由消费者从Kafka读取用户委托信息进行交易撮合相关操作。为了简单，在这里我们让消费者读取消息后在控制台打印日志来模拟交易撮合。</p>
+
+  <p class="zw">首先创建一个Maven工程，在pom.xml文件中加入Kafka以及Spring与Kafka集成的jar文件依赖配置。</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">&lt;dependency&gt;
+  &lt;groupId&gt;org.apache.kafka&lt;/groupId&gt;
+  &lt;artifactId&gt;kafka_2.11&lt;/artifactId&gt;
+  &lt;version&gt;0.10.1.1&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.kafka&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-kafka&lt;/artifactId&gt;
+  &lt;version&gt;1.1.5.RELEASE&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+  <p class="zw">因篇幅有限，该工程与Spring相关的application_context.xml文件以及web.xml文件的配置代码不再介绍。工程的目录结构如图6-4所示。</p>
+
+  <p class="tu"><img alt="" src="../images/00122.jpeg" class="calibre7"/></p>
+
+  <p class="tu_ti">图6-4　Spring与Kafka整合工程的目录结构</p>
+
+  <p class="zw">然后创建一个主题用来存储用户交易委托信息。创建该主题命令如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">kafka-topics.sh --zookeeper server-1:2181,server-2:2181,server-3:2181 --create --topic trade-entrust --partitions 3 --replication-factor 2</code></pre>
+
+  <p class="zw">到这里，Spring与Kafka整合的前期工作基本完成。下面分两小节详细介绍通过spring-kafka实现生产者发送消息以及消费者消费消息的详细过程。</p>
+
+  <h3 id="nav_point_156" class="calibre9">6.5.1　生产者</h3>
+
+  <p class="zw">Spring与Kafka整合后，创建生产者的相关操作交由Spring容器来管理。因此，我们创建一个producer.xml的文件，在该文件中实例化一个生产者。spring-kafka将KafkaProducer相关的操作封装成一个KafkaTemplate对象，因此要创建一个生产者就是要完成KafkaTemplate对象的实例化。</p>
+
+  <p class="zw">KafkaTemplate提供了KafkaTemplate(ProducerFactory&lt;K, V&gt; producerFactory)和KafkaTemplate (ProducerFactory&lt;K, V&gt; producerFactory, boolean autoFlush)两个构造方法。其中ProducerFactory是一个定义创建生产者的接口，该接口只定义了一个Producer&lt;K, V&gt; createProducer()方法，该接口有一个实现类DefaultKafkaProducerFactory。由于KafkaProducer是线程安全的，而且多个线程公用一个KafkaProducer实例比每个线程各自实例化一个KafkaProducer性能要好，因此DefaultKafkaProducerFactory以单例模式实例化了一个Kafka Producer。参数autoFlush用于控制生产者发送消费的方式，当该参数为true表示是以同步形式发送。</p>
+
+  <p class="zw">DefaultKafkaProducerFactory有两个构造方法，即DefaultKafkaProducerFactory(Map&lt;String, Object&gt; configs)和DefaultKafkaProducerFactory(Map&lt;String, Object&gt; configs, Serializer&lt;K&gt; keySerializer, Serializer&lt;V&gt; valueSerializer)。这两个构造方法构造形参与KafkaProducer相应构造方法的参数相同，也是通过一个Map对象指定实例化生产者的相关配置信息。</p>
+
+  <p class="zw">KafkaTemplate还提供了一个ProducerListener接口，该接口定义了onSuccess()方法和onError()方法两个方法，分别用于在消息发送成功和失败时进行相应处理。我们定义一个SpringKafkaProducerListener类实现该接口并重写这个方法，在消息发送成功或失败时打印输出相应信息。SpringKafkaProducerListener类的具体实现代码如代码清单6-30所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-30　SpringKafkaProducerListener类的具体实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">package com.kafka.action.chapter6.spring.producer;
+
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.springframework.kafka.support.ProducerListener;
+
+public class SpringKafkaProducerListener implements ProducerListener&lt;String, String&gt; {
+    public void onSuccess(String topic, Integer partition, String key, String value, 
+    RecordMetadata recordMetadata) {
+        System.out.println("委托成功:主题[" + topic + "],分区["+ 
+        recordMetadata.partition() + "],委托时间["+recordMetadata.timestamp()+"],委
+        托信息如下：");
+        System.out.println(value);
+    }
+    public void onError(String topic, Integer partition, String key, String value, 
+    Exception e) {
+        System.out.println("消息发送失败:topic:" + topic + ",value" + value+ ",exception:" 
+        + e.getLocalizedMessage());
+    }
+    public boolean isInterestedInSuccess() {
+        return true;// 要onSuccess方法被执行，需要返回true
+    }
+}</code></pre>
+
+  <p class="zw">在介绍produce.xml配置之前，我们首先创建一个kafka.properties文件，该文件用于定义实例化KafkaProducer的相关配置信息，该文件的内容如代码清单6-31所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-31　kafka.properties文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10"># 连接Kafka broker相关配置
+bootstrap.servers=server-1:9092,server-2:9092,server-3:9092 
+# 消息key序列化类
+key.serializer=org.apache.kafka.common.serialization.StringSerializer
+# 消息序列化类
+value.serializer=org.apache.kafka.common.serialization.StringSerializer 
+# 默认主题，即将当调用不指定主题的send方法时消息被发送到的主题
+defaultTopic=trade-entrust
+# 消息发送方式：true表示以同步方式发送
+autoFlush=true</code></pre>
+
+  <p class="zw">在producer.xml文件中加入实例化KafkaTemplate相关的配置，该文件的内容如代码清单6-32所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-32　producer.xml文件的具体内容</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">&lt;?xml version="1.0" encoding="UTF-8"?&gt;  
+&lt;beans xmlns="http://www.springframework.org/schema/beans"  
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  
+    xmlns:context="http://www.springframework.org/schema/context"  
+    xsi:schemaLocation="http://www.springframework.org/schema/beans  
+        http://www.springframework.org/schema/beans/spring-beans.xsd  
+        http://www.springframework.org/schema/context  
+        http://www.springframework.org/schema/context/spring-context.xsd"&gt;  
+
+    &lt;!-- 定义实例化KafkaProducer的参数 --&gt;  
+    &lt;bean id="producerProperties" class="Java.util.HashMap"&gt;  
+      &lt;constructor-arg&gt;  
+        &lt;map&gt;  
+          &lt;entry key="bootstrap.servers" value="${bootstrap.servers}"/&gt;  
+          &lt;entry key="key.serializer" value="${key.serializer}"/&gt;  
+          &lt;entry key="value.serializer" value="${value.serializer}"/&gt;  
+        &lt;/map&gt;  
+      &lt;/constructor-arg&gt;  
+    &lt;/bean&gt;  
+
+    &lt;!-- 实例化DefaultKafkaProducerFactory,用于根据配置创建一个KafkaProducer实例  --&gt;  
+    &lt;bean id="producerFactory" class="org.springframework.kafka.core.DefaultKafka 
+    ProducerFactory" &gt;  
+       &lt;constructor-arg&gt;  
+      &lt;ref bean="producerProperties"/&gt;  
+    &lt;/constructor-arg&gt;  
+  &lt;/bean&gt;  
+
+  &lt;bean id="producerListener" class="com.kafka.action.chapter6.spring.producer. SpringKafkaProducerListener"/&gt;
+  &lt;!-- 创建kafkatemplate--&gt;  
+  &lt;bean id="kafkaTemplate" class="org.springframework.kafka.core.KafkaTemplate"&gt; 
+    &lt;!-- 指定ProducerFactory实例 --&gt;
+    &lt;constructor-arg index="0" ref="producerFactory"/&gt; 
+    &lt;!-- 同步模式 --&gt; 
+    &lt;constructor-arg index="1" value="true"/&gt; 
+    &lt;!-- 指定一个默认的主题 --&gt; 
+    &lt;property name="defaultTopic" value="${defaultTopic}"/&gt;  
+    &lt;!-- 指定一个自定义的ProducerListener --&gt;
+    &lt;property name="producerListener" ref="producerListener"/&gt;
+  &lt;/bean&gt;  
+
+&lt;/beans&gt;</code></pre>
+
+  <p class="zw">在application_context.xml文件中导入producer.xml配置文件，即增加&lt;import resource= "classpath:spring/producer.xml" /&gt;配置。</p>
+
+  <p class="zw">最后，我们编写一个Spring控制器，用于模拟客户端提交交易委托，控制器接受交易请求后，将消息发送到Kafka。控制器的具体实现如代码清单6-33所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-33　控制器接受前端交易委托并发送到Kafka</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">package com.kafka.action.chapter6.spring.controller;
+
+import Java.io.PrintWriter;
+
+import Javax.servlet.http.HttpServletRequest;
+import Javax.servlet.http.HttpServletResponse;
+
+import net.sf.json.JSONObject;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+@Controller
+public class SpringKafkaController {
+    private static final Logger LOG = Logger.getLogger(SpringKafkaController.class);
+
+    @Autowired
+    private KafkaTemplate&lt;String, String&gt; kafkaTemplate;
+
+    @ResponseBody
+    @RequestMapping(value = "/trade_entrust", method = { RequestMethod.POST })
+    public void signIn(HttpServletRequest request, @RequestBody JSONObject params, 
+    HttpServletResponse response) {
+        PrintWriter writer = null;
+        String rspMsg = "委托失败";
+        try {
+            writer = response.getWriter();
+            String entrustInfo = params.toString();
+            // 这里通过验证请求参数不为空来表示一笔有效的委托
+            if(StringUtils.isNotBlank(entrustInfo)){
+                kafkaTemplate.sendDefault(entrustInfo);
+                rspMsg = "委托成功";
+            }else{
+                rspMsg = "请求参数非法";
+            }
+        } catch (Exception e) {
+            rspMsg = "消息发送失败";
+            LOG.error(rspMsg,e);
+        } finally {
+            writer.append(rspMsg);
+            if (writer != null) {
+                writer.close();
+            }
+        }
+    }
+}</code></pre>
+
+  <p class="zw">在Eclipse中运行该工程，同时通过Postman模拟用户交易委托。交易委托信息以JSON格式发送到后台。例如，定义交易委托的JSON数据如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">{
+    "user_id": "1000000", 
+    "sec_code": "601766",
+    "sec_price": "10.01",
+    "sec_name":"中国中车"
+}</code></pre>
+
+  <p class="zw">在Postman发送请求后，Eclipse输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">委托成功:主题[trade-entrust],分区[1],委托时间[1494633326839],委托信息如下：
+{"user_id":"1000000","sec_code":"601766","sec_price":"10.01","sec_name":"中国中车"}</code></pre>
+
+  <p class="zw">至此，Kafka与Spring整合实现生产者发送消息的功能已介绍完成。下面介绍Kafka与Spring整合实现消费者的详细步骤。</p>
+
+  <h3 id="nav_point_157" class="calibre9">6.5.2　消费者</h3>
+
+  <p class="zw">spring-kafka是通过监听模式消费消息的。spring-kafka定义了一个消息监听者容器接口MessageListenerContainer，该接口KafkaMessageListenerContainer和ConcurrentMessageListener Container有两个实现类，分别表示单线程容器和多线程并发容器。其实，多线程并发容器是根据用户指定的并发数（concurrency）来创建多个单线程容器。之所以称为线程容器，是由于消费者线程是交由消息监听者容器来管理，然而监听者容器并不是直接管理消费者线程，而是管理消费者工厂（ConsumerFactory）。spring-kafka对消费者管理实现方式和对生产者管理实现方式相同，即每一个消费者是由消费者工厂直接管理，包括创建消费者、提交消费偏移量，因此我们只需要在配置文件中实例化一个消费者工厂，由它来创建KafkaConsumer。</p>
+
+  <p class="zw">在介绍消息监听者容器配置之前，我们先来看这两个监听者容器的构造方法及主要属性。并发容器的构造方法为ConcurrentMessageListenerContainer(ConsumerFactory&lt;K, V&gt; consumerFactory, ContainerProperties containerProperties)，单线程容器构造方法也是依赖一个ConsumerFactory对象和一个ContainerProperties对象。其中ContainerProperties类定义实例化容器的相关配置，包括消费者消费的主题、分区与消费者分配关系等。若不指定分区与消费者分配关系，多线程并发容器会根据并发数与分区数自动进行分配。并发消费监听者容器有一个重要的属性concurrency，用于指定并发数，也就是消费者线程数。</p>
+
+  <p class="zw">由于是监听模式，所以需要创建一个监听器。spring-kafka提供了一个MessageListener接口，客户端只需实现该接口，并覆盖该接口的onMessage(ConsumerRecord&lt;String, String&gt; data)方法，在该方法中实现消费者对消息的具体业务处理。在装配监听者容器时以构造器注入方式将该监听器注入到容器。</p>
+
+  <p class="zw">首先定义一个消费者监听器，该监听器监听到消息后将消息打印到控制台，具体实现如代码清单6-34所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-34　消费者监听器的具体实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">package com.kafka.action.chapter6.spring.consumer;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.kafka.listener.MessageListener;
+
+public class SpringKafkaConsumerListener implements MessageListener&lt;String, String&gt; {
+    public void onMessage(ConsumerRecord&lt;String, String&gt; data) {
+        // 当读取到用户委托信息后，将委托信息加入到委托队列中,然后由撮合程序完成撮合,
+        // 这里我们只是简单地打印出委托信息
+        if (null != data) {
+        System.out.println("消费者线程:" + Thread.currentThread().getName()+ ",消息
+        来自Kafka,主题[" + data.topic() + "],分区["+ data.partition() + "],委托时间[" + 
+        data.timestamp()+ "]消息内容如下：");
+        System.out.println(data.value());
+        }
+    }
+}</code></pre>
+
+  <p class="zw">然后创建一个consumer.xml配置文件，用于装配消费者。本例我们创建一个Concurrent MessageListenerContainer容器，同时指定3个消费者线程，这3个消费者属于同一个消费组。一个简单的消费者装配过程，主要包括以下几部分配置。</p>
+
+  <p class="zw">（1）装配一个HashMap，定义实例化KafkaConsumer的配置参数。</p>
+
+  <p class="zw">（2）装配消费者工厂，以构造器注入方式指定消费者配置参数，消费者工厂负责消费者的创建。</p>
+
+  <p class="zw">（3）装配一个自定义的消息监听器，该监听器实现消费者具体业务逻辑。</p>
+
+  <p class="zw">（4）装配一个容器配置的Bean，以构造器注入的方式指定消费者所消费的主题，同时以属性注入的方式注入自定义的监听器。</p>
+
+  <p class="zw">（5）装配消息监听容器，若是多线程并发，通过属性注入的方式指定并发数，也就是消费者线程数。</p>
+
+  <p class="zw">在介绍consumer.xml配置文件具体内容之前，首先在Kafka.properties文件中加入装配消费者相关的资源信息，如代码清单6-35所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-35　消费者的相关配置信息</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10"># 消费组名
+group.id=trade_entrust
+# 是否自动提交偏移量
+enable.auto.commit=true
+# 自动提交偏移量的时间间隔
+auto.commit.interval.ms=1000
+# 线程数
+concurrency=3
+# 消息key反序列化类
+key.deserializer=org.apache.kafka.common.serialization.StringDeserializer 
+# 消息反序列化类
+value.deserializer=org.apache.kafka.common.serialization.StringDeserializer</code></pre>
+
+  <p class="zw">consumer.xml配置文件的详细内容如代码清单6-36所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-36　consumer.xml文件的详细配置信息</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans  
+        http://www.springframework.org/schema/beans/spring-beans.xsd  
+        http://www.springframework.org/schema/context  
+        http://www.springframework.org/schema/context/spring-context.xsd"&gt;
+    &lt;!-- 1.定义实例化KafkaConsumer的参数 --&gt;
+    &lt;bean id="consumerProperties" class="Java.util.HashMap"&gt;
+        &lt;constructor-arg&gt;
+            &lt;map&gt;
+                &lt;entry key="bootstrap.servers" value="${bootstrap.servers}" /&gt;
+                &lt;entry key="group.id" value="${group.id}" /&gt;
+                &lt;entry key="enable.auto.commit" value="${enable.auto.commit}" /&gt;
+                &lt;entry key="auto.commit.interval.ms" 
+                        value="${auto.commit.interval.ms}" /&gt;
+                &lt;entry key="key.deserializer" value="${key.deserializer}"/&gt;  
+            &lt;entry key="value.deserializer" value="${value.deserializer}"/&gt;  
+            &lt;/map&gt;
+        &lt;/constructor-arg&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- 2.创建consumerFactory --&gt;
+    &lt;bean id="consumerFactory"
+        class="org.springframework.kafka.core.DefaultKafkaConsumerFactory"&gt;
+        &lt;constructor-arg&gt;
+            &lt;ref bean="consumerProperties" /&gt;
+        &lt;/constructor-arg&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- 3.装配消息监听器，实现消费者具体业务处理逻辑--&gt;
+    &lt;bean id="consumerListener" 
+          class="com.kafka.action.chapter6.spring.consumer.SpringKafkaConsumerListener" /&gt;
+
+    &lt;!-- 4.消费者容器配置信息 --&gt;
+    &lt;bean id="containerProperties"
+        class="org.springframework.kafka.listener.config.ContainerProperties"&gt;
+        &lt;!-- 可以指定多个主题，支持正则表达式形式 --&gt;
+        &lt;constructor-arg value="${defaultTopic}" /&gt;
+        &lt;property name="messageListener" ref="consumerListener" /&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- 5.创建一个支持多线程的Listener容器 --&gt;
+    &lt;bean id="messageListenerContainer"
+        class="org.springframework.kafka.listener.ConcurrentMessageListenerContainer"
+        init-method="doStart"&gt;
+        &lt;constructor-arg ref="consumerFactory" /&gt;
+        &lt;constructor-arg ref="containerProperties" /&gt;
+        &lt;!-- 指定线程数 --&gt;
+        &lt;property name="concurrency" value="${concurrency}"&gt;&lt;/property&gt;
+    &lt;/bean&gt;
+&lt;/beans&gt;</code></pre>
+
+  <p class="zw">至此，通过Spring管理消费者相关配置已完成。现在启动Eclipse运行该工程，同样通过Postman发送四条模拟股票买入委托的消息。Eclipse控制台输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">消费者线程:messageListenerContainer-0-C-1,消息来自Kafka,主题[trade-entrust],分区[0],委托时间[1494679846883]消息内容如下：
+{"user_id":"1000000","sec_code":"601766","sec_price":"10.1","sec_name":"中国中车"}
+消费者线程:messageListenerContainer-2-C-1,消息来自Kafka,主题[trade-entrust],分区[2],委托时间[1494679857031]消息内容如下：
+{"user_id":"1000000","sec_code":"601766","sec_price":"10.5","sec_name":"中国中车"}
+消费者线程:messageListenerContainer-1-C-1,消息来自Kafka,主题[trade-entrust],分区[1],委托时间[1494679869406]消息内容如下：
+{"user_id":"1000000","sec_code":"601766","sec_price":"11.0","sec_name":"中国中车"}
+消费者线程:messageListenerContainer-0-C-1,消息来自Kafka,主题[trade-entrust],分区[0],委托时间[1494679873753]消息内容如下：
+{"user_id":"1000000","sec_code":"601766","sec_price":"11.3","sec_name":"中国中车"}</code></pre>
+
+  <p class="zw">由Eclipse控制台输出的信息可知：3个分区3个消费者，分区与消费者线程是以轮询的分配策略进行分配，每条消息被其中一个消费者消费。Spring与Kafka整合应用就简单介绍至此，更多的应用请读者查阅Spring官方网站进行深入了解。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0009_split_004.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0009_split_006.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>

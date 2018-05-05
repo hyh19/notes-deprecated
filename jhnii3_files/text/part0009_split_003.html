@@ -1,0 +1,1418 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+
+    <title>未知</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <link href="../stylesheet.css" rel="stylesheet" type="text/css"/>
+<link href="../page_styles.css" rel="stylesheet" type="text/css"/>
+
+  
+
+
+<link href="../calibreHtmlOutBasicCss.css" type="text/css" rel="stylesheet" />
+
+</head>
+<body>
+
+<div class="calibreMeta">
+  <div class="calibreMetaTitle">
+  
+  
+    
+    <h1>
+      <a href="../../jhnii3.html">Kafka入门与实践
+</a>
+    </h1>
+    
+    
+  
+  </div>
+  <div class="calibreMetaAuthor">
+    牟大恩
+
+  </div>
+</div>
+
+<div class="calibreMain">
+
+  <div class="calibreEbookContent">
+    
+      <div class="calibreEbNavTop">
+        
+          <a href="part0009_split_002.html" class="calibreAPrev">previous page</a>
+        
+
+        
+          <a href="part0009_split_004.html" class="calibreANext"> next page</a>
+        
+      </div>
+    
+
+    
+<h2 id="nav_point_149" class="sigil_not_in_toc">6.3　消费者API应用</h2>
+
+  <p class="zw">当前版本的Kafka还保留Scala版本的两套消费者，本书将其统称为旧版消费者。旧版消费者属于Kafka核心模块的一部分，分别为SimpleConsumer和ZooKeeperConsumerConnector。两套消费者对应的API分别称为低级（Low-Level）API和高级（High-Level）API。</p>
+
+  <p class="zw">低级API提供对消息更灵活的控制处理，但实现起来也更为复杂，调用者需要自己管理已消费的偏移量以及消费者平衡等。</p>
+
+  <p class="zw">高级API提供了一种简单、方便的对外接口，屏蔽了底层实现细节，消费者无需管理已消费的偏移量，Kafka会将每个分区已消费的最后偏移量保存在ZooKeeper的/consumers/${group.id}/ offsets/${topicName}/${partitionId}节点中。</p>
+
+  <p class="zw">在Kafka 0.9版本之后，通过Java语言对消费者进行了重新实现，即KafkaConsumer，本书将其称为新版消费者。新版消费者在实现上与旧版高级消费者的最大区别是不再强依赖于ZooKeeper。消费者提交的消费偏移量也不再保存到ZooKeeper当中，而是保存在Kafka内部主题“__consumer_offsets”之中，该主题默认有50个分区，每个分区有3个副本，分区数由配置项offsets.topic.num.partition设置，通过${group.id}的hashcode值与${offsets.topic.num.partition}取模的方式来确定某个消费组已消费的偏移量保存到该主题的哪个分区中。</p>
+
+  <h3 id="nav_point_150" class="calibre9">6.3.1　旧版消费者API应用</h3>
+
+  <p class="zw">对于旧版消费者提供的两套API，我们只介绍低级API的应用。对于高级API的应用本书不进行阐述，因为如果我们应用的是Kafka 0.10以上的版本，推荐使用KafkaConsumer，也就是本书所说的新版消费者。</p>
+
+  <p class="zw">低级消费者API虽然应用起来较为复杂，但允许客户端对消息进行灵活的控制，因此，在实际开发应用中也颇受欢迎。以下几种常见应用场景通过低级API来实现则更为方便。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">支持消息重复消费。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">添加事务管理机制，保证消息被处理且仅被处理一次。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">只消费指定分区或者指定分区的某些片段。</li>
+  </ul>
+
+  <p class="zw">应用消费者低级API编程实现一个消费者，一般步骤包括以下几步。</p>
+
+  <p class="zw">（1）获取指定主题相应分区对应的元数据信息。</p>
+
+  <p class="zw">（2）由于副本机制的引入，Leader代理节点负责读写操作，因此需要找出指定分区的Leader副本节点，创建一个SimpleConsumer，建立与Leader副本的连接。</p>
+
+  <p class="zw">（3）构造消费请求。</p>
+
+  <p class="zw">（4）获取数据并处理。</p>
+
+  <p class="zw">（5）对偏移量进行处理。</p>
+
+  <p class="zw">（6）当代理发送变化时进行相应处理，保证消息被正常消费。</p>
+
+  <p class="zw">现在我们通过Java语言调用低级消费者API实现一个消费者，该消费者只是简单地将拉取到的消息打印出来。为实现该功能，我们创建一个KafkaSimpleConsumer类，在该类中首先定义一些常量，如代码清单6-10所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-10　KafkaSimpleConsumer类常量的定义</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">public class KafkaSimpleConsumer {
+    private static final Logger LOG = Logger.getLogger(KafkaSimpleConsumer.class);
+    /** 
+      指定Kafka集群代理列表,列表无需指定所有的代理地址,
+      只要保证能连上Kafka集群即可，一般建议多个节点时至少写两个节点的地址 
+    */
+    private static final String BROKER_LIST = "172.117.12.61,172.117.12.62";
+    /** 连接超时时间设置为1分钟 */
+    private static final int TIME_OUT = 60 * 1000;
+    /** 设置读取消息缓冲区大小 */
+    private static final int BUFFER_SIZE = 1024 * 1024;
+    /** 设置每次获取消息的条数 */
+    private static final int FETCH_SIZE = 100000;
+    /** broker的端口 */
+    private static final int PORT = 9092;
+    /** 设置容忍发生错误时重试的最大次数 */
+    private static final int MAX_ERROR_NUM = 3;
+}</code></pre>
+
+  <p class="zw">接下来，定义一个获取指定主题相应分区元数据信息的方法PartitionMetadata fetchPartition Metadata(List&lt;String&gt; brokerList, int port, String topic, int partitionId)，该方法返回分区元数据信息PartitionMetadata对象。获取分区元数据信息逻辑如下。</p>
+
+  <p class="zw">（1）实例化一个SimpleConsumer，该消费者作为获取元数据信息的执行者。</p>
+
+  <p class="zw">（2）构造获取主题元数据信息的请求TopicMetadataRequest。</p>
+
+  <p class="zw">（3）通过Consumer.send()正式与代理建立连接，连接上代理后发送TopicMetadataRequest请求。</p>
+
+  <p class="zw">（4）从步骤（3）返回响应结果中获取主题元数据信息TopicMetadata列表，每个主题的每个分区的元数据信息对应一个TopicMetadata对象，遍历主题元数据信息列表，获取当前分区对应的元数据信息PartitionMeatadata。</p>
+
+  <p class="zw">fetchPartitionMetadata()方法具体实现代码见代码清单6-11所示。在具体实现代码中，为了防止只进行一次连接请求而得不到元数据信息，这里在实现时通过轮询多个代理节点，若与某个节点创建连接时发生异常，则继续尝试与下一个代理节点创建连接，直到请求成功或者轮询完所配置的代理节点。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-11　获取分区元数据方法的具体实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">private PartitionMetadata fetchPartitionMetadata(List&lt;String&gt; brokerList, int port,
+String topic, int partitionId) {
+    SimpleConsumer consumer = null;
+    TopicMetadataRequest metadataRequest = null;
+    TopicMetadataResponse metadataResp = null;
+    List&lt;TopicMetadata&gt; topicsMetadata = null;
+    try {
+        for (String host : brokerList) {
+            // 1.构造一个消费者用于获取元数据信息的执行者
+            consumer = new SimpleConsumer(host, port, TIME_OUT, BUFFER_SIZE, 
+            "fetch-metadata");
+            // 2.构造请求主题的元数据的request
+            metadataRequest = new TopicMetadataRequest(Arrays.asList(topic));
+            // 3.发送获取主题元数据的请求
+            try {
+                metadataResp = consumer.send(metadataRequest);
+            } catch (Exception e) {// 有可能与代理连接失败
+                LOG.error("Send topicMetadataRequest occurs exception.",e);
+                continue;
+            }
+            // 4.获取主题元数据列表
+            topicsMetadata = metadataResp.topicsMetadata();
+            // 5.主题元数据列表中提取指定分区的元数据信息
+            for (TopicMetadata metaData : topicsMetadata) {
+                for (PartitionMetadata item : metaData.partitionsMetadata()) {
+                    if (item.partitionId() != partitionId) {
+                        continue;
+                    } else {
+                        return item;
+                    }
+                }
+            }
+        }
+    } catch (Exception e) {
+        LOG.error("Fetch PartitionMetadata occurs exception", e);
+    } finally {
+        if (null != consumer) {
+            consumer.close();
+        }
+    }
+    return null;
+}</code></pre>
+
+  <p class="zw">同时，我们还需要实现对消费偏移量的管理，在每次拉取消息时需要指定起始偏移量。更多时候我们可能关注消息的起始偏移量或者消息的最大偏移量。为此定义一个获取消息偏移量的方法long getLastOffset(SimpleConsumer consumer, String topic, int partition, long beginTime, String clientName)，该方法逻辑较简单，只需要构造一个OffsetRequest请求，在构造OffsetRequest请求参数PartitionOffsetRequestInfo对象时，通过将时间设置为kafka.api.OffsetRequest.EarliestTime()，则表示获取消息的起始偏移量；若时间设置为kafka.api.OffsetRequest.LatestTime()，则表示获取消息最大偏移量。然后通过当前的消费者发送获取偏移量的请求，从响应中得到相应的偏移量，实现代码如代码清单6-12所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-12　获取消息偏移量方法的具体实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">private long getLastOffset(SimpleConsumer consumer, String topic, int partition, long 
+beginTime, String clientName) {
+    TopicAndPartition topicAndPartition = new TopicAndPartition(topic, partition);
+    Map&lt;TopicAndPartition, PartitionOffsetRequestInfo&gt; requestInfo = new HashMap 
+    &lt;TopicAndPartition, PartitionOffsetRequestInfo&gt;();
+    // 设置获取消息起始offset
+    requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(beginTime, 1));
+    // 构造获取offset请求
+    OffsetRequest request = new OffsetRequest(requestInfo, kafka.api.OffsetRequest. 
+    CurrentVersion(), clientName);
+    OffsetResponse response = consumer.getOffsetsBefore(request);
+
+    if (response.hasError()) {
+     LOG.error("Fetch last offset occurs exception:" + response.errorCode(topic, 
+     partition));
+     return -1;
+    }
+    long[] offsets = response.offsets(topic, partition);
+    if (null == offsets || offsets.length == 0) {
+        LOG.error("Fetch last offset occurs error,offses is null.");
+        return -1;
+    }
+
+    return offsets[0];
+}</code></pre>
+
+  <p class="zw">然后，我们定义一个consume(List&lt;String&gt; brokerList, int port, String topic, int partitionId)方法，该方法调用fetchPartitionMetadata()方法及getLastOffset()方法实现消费者拉取消息的功能。在该方法中我们并没有对代理失效及发生异常进行相应处理，只是简单地尝试再次根据当前分区的Leader节点信息实例化一个消费者，直到失败次数达到能够容忍的最大值时，程序退出。该方法的具体实现如代码清单6-13所示。</p>
+
+  <p class="zw"><strong class="calibre1">代码清单6-13　consume方法的具体实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">public void consume(List&lt;String&gt; brokerList, int port, String topic, int partitionId) {
+    SimpleConsumer consumer = null;
+    try {
+        // 1.首先获取指定分区的元数据信息
+        PartitionMetadata metadata = fetchPartitionMetadata(brokerList, port, topic, 
+        partitionId);
+        if (metadata == null) {
+            LOG.error("Can't find metadata info");
+            return;
+        }
+        if (metadata.leader() == null) {
+            LOG.error("Can't find the partition:" + partitionId + " 's leader.");
+            return;
+        }
+        String leadBroker = metadata.leader().host();
+        String clientId = "client-" + topic + "-" + partitionId;
+
+        // 2.创建一个消息者作为消费消息的真正执行者
+        consumer = new SimpleConsumer(leadBroker, port, TIME_OUT, BUFFER_SIZE, 
+        clientId);
+        // 设置时间为kafka.api.OffsetRequest.EarliestTime()从最新消息起始处开始
+        long lastOffset = getLastOffset(consumer, topic, partitionId, 
+        kafka.api.OffsetRequest.EarliestTime(), clientId);
+        int errorNum = 0;
+        FetchRequest fetchRequest = null;
+        FetchResponse fetchResponse = null;
+        while (lastOffset &gt; -1) {
+            // 当在循环过程中出错时将起始实例化的consumer关闭并设置为null
+            if (consumer == null) {
+                 consumer = new SimpleConsumer(leadBroker, port, TIME_OUT, BUFFER_SIZE, 
+                 clientId);
+            }
+        // 3.构造获取消息的request
+        fetchRequest = new FetchRequestBuilder().clientId(clientId).addFetch(topic, 
+        partitionId, lastOffset, FETCH_SIZE).build();
+        // 4.获取响应并处理
+        fetchResponse = consumer.fetch(fetchRequest);
+        if (fetchResponse.hasError()) {// 若发生错误
+            errorNum++;
+            if (errorNum &gt; MAX_ERROR_NUM) {// 达到发生错误的最大次数时退出循环
+                break;
+            }
+            // 获取错误码
+            short errorCode = fetchResponse.errorCode(topic, partitionId);
+            // offset已无效,因为在获取lastOffset时设置为从最早开始时间,若是这种错误码，
+            // 我们再将时间设置为从LatestTime()开始查找
+            if (ErrorMapping.OffsetOutOfRangeCode() == errorCode) {
+                lastOffset = getLastOffset(consumer, topic, partitionId, 
+                kafka.api.OffsetRequest.LatestTime(), clientId);
+                continue;
+            } else if (ErrorMapping.OffsetsLoadInProgressCode() == errorCode) {
+                Thread.sleep(30000);// 若是这种异常则让线程休眠30s
+                continue;
+            } else {// 这里只是简单地关闭当前分区Leader信息实例化的Consumer，
+                    // 并没有对代理失效时进行相应处理
+               consumer.close();
+               consumer = null;
+               continue;
+         }
+     } else {
+         errorNum = 0;// 错误次数清零
+        long fetchNum = 0;
+        for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(topic, 
+        partitionId)) {
+            long currentOffset = messageAndOffset.offset();
+            if (currentOffset &lt; lastOffset) {
+                LOG.error("Fetch an old offset: " + currentOffset + "expect the offset 
+                is greater than " + lastOffset);
+                     continue;
+            }
+            lastOffset = messageAndOffset.nextOffset();
+            ByteBuffer payload = messageAndOffset.message().payload();
+
+            byte[] bytes = new byte[payload.limit()];
+            payload.get(bytes);
+            // 简单打印出消息及消息offset
+            LOG.info("message:" + (new String(bytes, "UTF-8")) + ",offset:" + 
+            messageAndOffset.offset());
+                fetchNum++;
+        }
+
+        if (fetchNum == 0) {// 如果还没有消息，则让线程阻塞几秒
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+            }
+        }
+     }
+  }
+  } catch (InterruptedException | UnsupportedEncodingException e) {
+      LOG.error("Consume message occurs exception.", e);
+  } finally {
+      if (null != consumer) {
+          consumer.close();
+      }
+  }
+}</code></pre>
+
+  <p class="zw">最后，在main方法中调用该消费者。例如，这里指定该消费者从主题名为“stock-quotation- partition”、分区编号为5的分区中拉取消息，如代码清单6-14所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-14　实例化自定义的低级消费者</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">public static void main(String[] args) {
+    KafkaSimpleConsumer consumer = new KafkaSimpleConsumer();
+    consumer.consume(Arrays.asList(StringUtils.split(BROKER_LIST, ",")), PORT, 
+    "stock-quotation-partition", 5);
+}</code></pre>
+
+  <p class="zw">该程序执行后，在控制台输出信息如下：</p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">2017-03-04 15:59:56 [INFO]-[com.kafka.action.chapter6.KafkaSimpleConsumer] message: 600105|股票-600105|1488453151949|11.8|11.0,offset:0
+2017-03-04 15:59:56 [INFO]-[com.kafka.action.chapter6.KafkaSimpleConsumer] message: 600105|股票-600105|1488453153954|11.8|10.77,offset:1
+2017-03-04 15:59:56 [INFO]-[com.kafka.action.chapter6.KafkaSimpleConsumer] message: 600105|股票-600105|1488453157987|11.8|10.6,offset:2</code></pre>
+
+  <h3 id="nav_point_151" class="calibre9">6.3.2　新版消费者API应用</h3>
+
+  <p class="zw">本节将介绍KafkaConsumer相关的API应用，包括创建消费者、订阅主题、消费者偏移量管理、消费者多线程实现方式等。</p>
+
+  <h4 class="sigil_not_in_toc1">1．创建消费者</h4>
+
+  <p class="zw">实例化一个KafkaConsumer对象与实例化KafkaProducer对象的步骤相同，KafkaConsumer构造方法接受一个Java.util.Properties类型的参数，用于客户端指定消费者相关的配置属性。通常实例化一个KafkaConsumer对象客户端需要指定连接Kafka节点的bootstrap.servers属性、消息Key反序列化类的key.deserializer属性、消息Value反序化类的value.deserializer属性、是否自动提交消费偏移量的enable.auto.commit属性，同时由于每个消费者都属于一个特定的消费组，因此我们一般通过group.id参数指定该消费者所属的消费组。为了便于追踪消费者，我们通过client.id参数为每个消费者指定一个消费者名称。消费者的其他配置可参照表4-8所示。</p>
+
+  <p class="zw">创建一个KafkaConsumer对象的实现代码如代码清单6-15所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-15　创建KafkaConsumer对象的实现代码</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "test");
+props.put("client.id", "test");
+props.put("key.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+props.put("value.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+KafkaConsumer&lt;String, String&gt; consumer = new KafkaConsumer&lt;&gt;(props);</code></pre>
+
+  <p class="zw">在没有指定消费偏移量提交方式时，默认是每隔1秒自动提交偏移量。可以通过auto. commit.interval.ms参数设置偏移量提交的时间间隔。</p>
+
+  <h4 class="sigil_not_in_toc1">2．订阅主题</h4>
+
+  <p class="zw">在实例化一个消费者之后，我们需要为该消费者订阅主题。一个消费者可以同时订阅多个主题，通常我们可以以集合的形式指定多个主题，或者以正则表达式形式订阅特定模式的主题。</p>
+
+  <p class="zw">同时，在订阅主题时还可以注册一个回调监听器，用于当消费者发生平衡时回调处理。该监听器为ConsumerRebalanceListener接口，当消费者发生平衡操作时，可以在该接口的相应方法中完成必要的应用程序逻辑处理，如提交消费偏移量操作。该接口定义了两个回调方法：一个是在消费者平衡操作开始之前、消费者停止拉取消息之后被调用的onPartitionsRevoked (Collection&lt;TopicPartition&gt; partitions)方法，在该方法中我们可以提交偏移量操作以避免数据重复消费：另一个是在平衡之后、消费者开始拉取消息之前被调用的onPartitionsAssigned (Collection &lt;TopicPartition&gt; partitions)方法，一般我们在该方法中保证各消费者回滚到正确的偏移量，即重置各消费者消费偏移量。</p>
+
+  <p class="zw">Kafka定义了以下3种订阅主题方法。</p>
+
+  <ul class="calibre4">
+    <li class="di_1ji_wu_xu_lie_biao">subscribe(Collection&lt;String&gt; topics)方法，以集合形式指定消费者订阅的主题，通常我们用ArrayList。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">subscribe(Collection&lt;String&gt; topics, ConsumerRebalanceListener listener)方法，订阅主题时指定一个监听器，用于在消费者发生平衡操作时回调进行相应的业务处理。</li>
+
+    <li class="di_1ji_wu_xu_lie_biao">subscribe(Pattern pattern, ConsumerRebalanceListener listener)方法，以正则表达式形式指定匹配特定模式的主题。</li>
+  </ul>
+
+  <p class="zw">如代码清单6-16所示，让前一小节实例化的消费者订阅“stock-quotation”主题，同时实现一个消费者平衡回调监听器，在onPartitionsRevoked()方法中提交消费者已拉取的消息偏移量，在onPartitionsAssigned()方法中重置消费者对各分区已消费的偏移量到已提交的偏移量处。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-16　订阅主题具体实现的核心逻辑</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">consumer.subscribe(Arrays.asList("stock-quotation"),new ConsumerRebalanceListener() {
+    @Override
+    public void onPartitionsRevoked(Collection&lt;TopicPartition&gt; partitions) {
+        consumer.commitSync();// 提交偏移量
+    }
+
+    @Override
+    public void onPartitionsAssigned(Collection&lt;TopicPartition&gt; partitions) {
+        long committedOffset=-1;
+        for(TopicPartition topicPartition:partitions){
+            // 获取该分区已消费的偏移量
+            committedOffset = consumer.committed(topicPartition).offset();
+            // 重置偏移量到上一次提交的偏移量下一个位置处开始消费
+            consumer.seek(topicPartition, committedOffset+1); 
+        }
+    }
+});</code></pre>
+
+  <p class="zw">在订阅主题之后，就可以通过Kafka提供的poll(long timeout)方法轮询拉取消息。</p>
+
+  <h4 class="sigil_not_in_toc1">3．订阅指定分区</h4>
+
+  <p class="zw">Kafka消费者可以通过调用KafkaConsumer.subscribe()方法订阅主题，也可以直接订阅某些主题的特定分区。Kafka消息者API提供了一个assign(Collection&lt;TopicPartition&gt; partitions)方法用来订阅指定的分区。</p>
+
+  <p class="zw">例如，我们指定消费者只订阅主题“stock-quotation”的编号0和2的分区，实现该功能的代码片段如代码清单6-17所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-17　订阅特定分区</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">consumer.assign(Arrays.asList(new TopicPartition("stock-quotation", 0),new TopicPartition ("stock-quotation", 2) ));</code></pre>
+
+  <p class="zw">通过subscribe()方法订阅主题具有消费者自动均衡的功能。在多线程条件下多个消费者进程根据分区分配策略自动分配消费者线程与分区的关系，当一个消费组的消费者发生增减变化时，分区分配关系会自动调整，以实现消费负载均衡及故障自动转移。而assign()方法订阅主题时，不具有消费者自动均衡的功能。</p>
+
+  <h4 class="sigil_not_in_toc1">4．消费偏移量管理</h4>
+
+  <p class="zw">Kafka消费者API提供了两个方法用于查询消费偏移量的操作，一个是committed(TopicPartition partition)方法，该方法返回一个OffsetAndMetadata对象，通过OffsetAndMetadata对象可以获取指定分区已提交的偏移量；另一个是返回下一次拉取位置的position(TopicPartition partition)方法。</p>
+
+  <p class="zw">同时，Kafka消费者API还提供了重置消费偏移量的方法。seek(TopicPartition partition, long offset)方法用于将消费起始位置重置到指定的偏移量位置，还有另外两个重置消费偏移量的方法，即seekToBeginning()方法和seekToEnd()方法。seekToBeginning()方法指定从消息起始位置开始消费，对应偏移量重置策略auto.offset.reset=earliest；seekToEnd()方法指定从最新消息对应的位置开始消费，也就是说要等待新的消息写入后才进行拉取，对应偏移量重置策略auto.offset.reset=latest。</p>
+
+  <p class="zw">Kafka消费者消费位移确认有自动提交与手动提交两种策略。在创建KafkaConsumer对象时，通过参数enable.auto.commit设定，true表示是自动提交，默认是自动提交。自动提交策略由消费者协调器（ConsumerCoordinator）每隔${ auto.commit.interval.ms}毫秒执行一次偏移量的提交。手动提交需要由客户端自己控制偏移量的提交。</p>
+
+  <p class="zw">（1）<strong class="calibre1">自动提交</strong>。在创建一个消费者时，默认是自动提交偏移量，当然我们也可以显示设置为自动。例如，我们创建一个消费者，该消费者自动提交偏移量，程序代码片段如代码清单6-18所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-18　自动提交偏移量的消费者实例</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "test");
+props.put("client.id", "test");
+props.put("enable.auto.commit", true);// 显示设置偏移量自动提交
+props.put("auto.commit.interval.ms", 1000);// 设置偏移量提交时间间隔
+props.put("key.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+props.put("value.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+KafkaConsumer&lt;String, String&gt; consumer = new KafkaConsumer&lt;&gt;(props);// 创建消费者
+consumer.subscribe(Arrays.asList("stock-quotation"));// 订阅主题
+
+try {
+    while (true) {
+        // 长轮询拉取消息
+        ConsumerRecords&lt;String, String&gt; records = consumer.poll(1000);
+        for (ConsumerRecord&lt;String, String&gt; record : records)// 简单打印出消息内容
+        System.out.printf("partition = %d, offset = %d,key= %s value = %s%n",
+                          record.partition(), record.offset(), 
+                          record.key(),record.value());
+    }
+} catch(Exception e){
+    // TODO 异常处理
+    e.printStackTrace();
+} finally {
+    consumer.close();
+}</code></pre>
+
+  <p class="zw">由代码清单6-18可知，自动提交偏移量，客户端只关注业务处理，在程序中没有任何关于提交偏移量的操作，更不像SimpleConsumer在每次poll之前都需要知道拉取消息的位置。</p>
+
+  <p class="zw">（2）<strong class="calibre1">手动提交</strong>。手动提交策略提供了一种对偏移量更加灵活控制的管理方式，在有些场景我们可能对消费偏移量有更精确的管理，以保证消息不被重复消费以及消息不被丢失。假设我们对拉取到的消息需要写入数据库处理，或者其他网络访问请求，抑或更复杂的业务处理，在这种场景下我们认为所有的业务处理完成才认为消息被成功消费，显然在这种场景下我们必须手动控制偏移量的提交。</p>
+
+  <p class="zw">Kafka提供了异步提交（commitAsync）及同步提交（commitSync）两种手动提交的方式。两者的主要区别在于同步模式下提交失败时一直尝试提交，直到遇到无法重试的情况下才会结束，同时同步方式下消费者线程在拉取消息时会被阻塞，直到偏移量提交操作成功或者在提交过程中发生错误。而异步方式下消费者线程不会被阻塞，可能在提交偏移量操作的结果还未返回时就开始进行下一次的拉取操作，在提交失败时也不会尝试提交。</p>
+
+  <p class="zw">实现手动提交前需要在创建消费者时关闭自动提交，即设置enable.auto.commit=false。然后在业务处理成功后调用commitAsync()或commitSync()方法手动提交偏移量。由于同步提交会阻塞线程直到提交消费偏移量执行结果返回，而异步提交并不会等消费偏移量提交成功后再继续下一次拉取消息的操作，因此异步提交还提供了一个偏移量提交回调的方法commitAsync (OffsetCommitCallback callback)。当提交偏移量完成后会回调OffsetCommitCallack接口的onComplete()方法，这样客户端根据回调结果执行不同的逻辑处理。</p>
+
+  <p class="zw">一个简单的手动提交消费偏移量的实现逻辑如代码清单6-19所示。需要说明的是，代码清单6-19只是简单给出手动提交的一般思路，并没有考虑异常处理及代码优化方面的问题。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-19　手动提交消费偏移量的简单实现代码片段</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "test");
+props.put("client.id", "test");
+props.put("fetch.max.bytes", 1024);// 为了便于测试，这里设置一次fetch请求取得的数据最大
+                                   //值为1KB,默认是5MB
+props.put("enable.auto.commit", false);// 设置手动提交偏移量
+props.put("key.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+props.put("value.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+KafkaConsumer&lt;String, String&gt; consumer = new KafkaConsumer&lt;&gt;(props);
+// 订阅主题
+consumer.subscribe(Arrays.asList("stock-quotation"));
+try {
+    int minCommitSize = 10;// 最少处理10条消息后才进行提交
+    int icount = 0 ;// 消息计算器
+    while (true) {
+        // 等待拉取消息
+        ConsumerRecords&lt;String, String&gt; records = consumer.poll(1000);
+        for (ConsumerRecord&lt;String, String&gt; record : records) {
+           // 简单打印出消息内容,模拟业务处理
+           System.out.printf("partition = %d, offset = %d,key= %s value = %s%n",
+           record. partition(), record.offset(), record.key(),record.value());
+           icount++;
+        }
+       // 在业务逻辑处理成功后提交偏移量
+       if (icount &gt;= minCommitSize){
+            consumer.commitAsync(new OffsetCommitCallback() {
+                @Override
+                public void onComplete(Map&lt;TopicPartition, OffsetAndMetadata&gt; offsets, 
+                Exception exception) {
+                    if (null == exception) {
+                        // TODO 表示偏移量成功提交
+                        System.out.println("提交成功");
+                    } else {
+                        // TODO 表示提交偏移量发生了异常，根据业务进行相关处理
+                        System.out.println("发生了异常");
+                    }
+            }
+       });
+       icount=0; // 重置计数器
+    }
+}
+} catch(Exception e){
+    // TODO 异常处理
+    e.printStackTrace();
+} finally {
+    consumer.close();
+}</code></pre>
+
+  <h4 class="sigil_not_in_toc1">5．以时间戳查询消息</h4>
+
+  <p class="zw">Kafka在0.10.1.1版本增加了时间戳索引文件，因此我们除了直接根据偏移量索引文件查询消息之外，还可以根据时间戳来访问消息。Kafka消费者API提供了一个offsetsForTimes (Map&lt;TopicPartition, Long&gt; timestampsToSearch)方法，该方法入参为一个Map对象，Key为待查询的分区，Value为待查询的时间戳，该方法会返回时间戳大于等于待查询时间的第一条消息对应的偏移量和时间戳。需要注意的是，若待查询的分区不存在，则该方法会被一直阻塞。</p>
+
+  <p class="zw">假设我们希望从某个时间段开始消费，那们就可以用offsetsForTimes()方法定位到离这个时间最近的第一条消息的偏移量，在查到偏移量之后调用seek(TopicPartition partition, long offset)方法将消费偏移量重置到所查询的偏移量位置，然后调用poll()方法长轮询拉取消息。例如，我们希望从主题“stock-quotation”第0分区距离当前时间相差12小时之前的位置开始拉取消息，实现逻辑如代码清单6-20所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-20　按时间查询消费实例的实现代码片段</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "test");
+props.put("client.id", "test");
+props.put("enable.auto.commit", true);// 显示设置偏移量自动提交
+props.put("auto.commit.interval.ms", 1000);// 设置偏移量提交时间间隔
+props.put("key.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+props.put("value.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+KafkaConsumer&lt;String, String&gt; consumer = new KafkaConsumer&lt;&gt;(props);
+// 订阅主题
+consumer.assign(Arrays.asList(new TopicPartition("stock-quotation", 0)));
+try {
+    Map&lt;TopicPartition, Long&gt; timestampsToSearch = new HashMap&lt;TopicPartition, 
+    Long&gt;();
+    // 构造待查询的分区
+    TopicPartition partition = new TopicPartition("stock-quotation", 0); 
+    // 设置查询12小时之前消息的偏移量
+    timestampsToSearch.put(partition, (System.currentTimeMillis() - 12 * 3600 * 
+    1000)); 
+     // 会返回时间大于等于查找时间的第一个偏移量
+    Map&lt;TopicPartition, OffsetAndTimestamp&gt; offsetMap = 
+    consumer.offsetsForTimes (timestampsToSearch); 
+    OffsetAndTimestamp offsetTimestamp = null;
+    // 这里依然用for轮询，当然由于本例是查询的一个分区，因此也可以用if处理
+    for (Map.Entry&lt;TopicPartition, OffsetAndTimestamp&gt; entry : offsetMap.entrySet()) { 
+        // 若查询时间大于时间戳索引文件中最大记录索引时间，
+        // 此时value为空,即待查询时间点之后没有新消息生成
+        offsetTimestamp = entry.getValue();
+        if (null != offsetTimestamp) {
+            // 重置消费起始偏移量
+           consumer.seek(partition, entry.getValue().offset());
+        }
+    }
+    while (true) {
+        // 等待拉取消息
+        ConsumerRecords&lt;String, String&gt; records = consumer.poll(1000);
+        for (ConsumerRecord&lt;String, String&gt; record : records){
+            // 简单打印出消息内容
+            System.out.printf("partition = %d, offset = %d,key= %s value = %s%n",
+             record.partition(), record.offset(), record.key(),record.value());
+        }
+    }
+} catch (Exception e) {
+    e.printStackTrace();
+} finally {
+    consumer.close();
+}</code></pre>
+
+  <h4 class="sigil_not_in_toc1">6．消费速度控制</h4>
+
+  <p class="zw">Kafka还提供了对消费速度控制的方法，在有些应用场景我们可能需要暂停某些分区消费，先消费其他分区，当达到一定条件时再恢复对这些分区的消费。</p>
+
+  <p class="zw">当同时消费多个主题，并将不同主题的消息进行关联运算逻辑处理或是流式计算时的Join操作时，由于不同主题数据产生的速率不尽相同，此时我们就可以通过控制消息生产速率较快的主题的消费速度，先从生产速率慢的主题中获取消息。</p>
+
+  <p class="zw">Kafka提供pause(Collection&lt;TopicPartition&gt; partitions)和resume(Collection&lt;TopicPartition&gt; partitions)方法，分别用来暂停某些分区在拉取操作时返回数据给客户端和恢复某些分区向客户端返回数据操作。通过这两个方法可以对消费速度加以控制，这两个方法应用较简单，只是需要在业务中合理应用，这里不再对其用法进行过多介绍。</p>
+
+  <h4 class="sigil_not_in_toc1">7．多线程实现</h4>
+
+  <p class="zw">KafkaConsumer为非线程安全的，多线程需要处理好线程同步。多线程的实现方式有多种，我们在这里介绍一种常见的实现方式，即每个线程各自实例化一个KafkaConsumer对象。当然，这种方式并不是一种最佳选择，因为当这些线程属于同一个消费组时线程数受限于分区数，根据前面介绍的消费者与分区数的关系，当消费者数大于分区数时就有部分消费者一直处于空闲状态。</p>
+
+  <p class="zw">本节介绍的多线程是基于主题级别的消费，也就是说，多个消费者线程消费一个主题，而不是多个线程消费同一个分区，若多个线程消费同一个分区时需要考虑偏移量提交处理的问题，相对而言实现较复杂，我们不进行介绍，在实际应用中一般也不推荐。事实上，一般我们是将分区作为消费者线程的最小划分单位。</p>
+
+  <p class="zw">我们依然通过多线程消费stock-quotation主题的消息，消费者拉取到消息后仅打印输出消息内容。首先创建一个消费者线程，具体实现逻辑如代码清单6-21所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-21　消费者线程的具体实现</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">package com.kafka.action.chapter6.consumer;
+
+import Java.util.Arrays;
+import Java.util.Map;
+import Java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer
+
+public class KafkaConsumerThread extends Thread {
+    // 每个线程拥有私有的KafkaConsumer实例
+    private KafkaConsumer&lt;String, String&gt; consumer;
+
+    public KafkaConsumerThread(Map&lt;String, Object&gt; consumerConfig, String topic) {
+        Properties props = new Properties();
+        props.putAll(consumerConfig);
+        this.consumer = new KafkaConsumer&lt;String, String&gt;(props);
+        consumer.subscribe(Arrays.asList(topic));
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                ConsumerRecords&lt;String, String&gt; records = consumer.poll(1000);
+                for (ConsumerRecord&lt;String, String&gt; record : records) {
+                    // 简单打印出消息内容
+                    System.out.printf("threadId=%s,partition = %d, offset = %d,
+                                       key= %s value = %s%n",
+                                       Thread.currentThread().getId(),
+                                       record.partition(), record.offset(),
+                                       record.key(), record.value());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            consumer.close();
+        }
+    }
+}</code></pre>
+
+  <p class="zw">由于stock-quotation主题有6个分区，因此我们创建一个主类用于创建6个消费者线程，具体实现如代码清单6-22所示。</p>
+
+  <p class="calibre21"><strong class="calibre1">代码清单6-22　创建6个消费者线程消费同一个主题的实现逻辑</strong></p>
+  <pre class="dai_ma_wu_xing_hao"><code class="calibre10">import Java.util.HashMap;
+import Java.util.Map;
+
+public class KafkaConsumerExecutor {
+
+    public static void main(String[] args) {
+        Map&lt;String, Object&gt; config = new HashMap&lt;String, Object&gt;();
+        config.put("bootstrap.servers", "localhost:9092");
+        config.put("group.id", "test"); // 6个线程属于同一个消费组
+        config.put("enable.auto.commit", true);// 显示设置偏移量自动提交
+        config.put("auto.commit.interval.ms", 1000);// 设置偏移量提交时间间隔
+        config.put("key.deserializer",
+                   "org.apache.kafka.common.serialization.StringDeserializer");
+        config.put("value.deserializer",
+                   "org.apache.kafka.common.serialization.StringDeserializer");
+
+        for(int i=0;i&lt;6;i++){
+            new KafkaConsumerThread(config, "stock-quotation").start();
+        }
+    }
+}</code></pre>
+
+  <p class="zw">运行该main()方法，从控制台输出信息可以看到每个分区由固定的线程消费。</p>
+
+  
+
+  </div>
+
+  
+  <div class="calibreToc">
+    <h2><a href="../../jhnii3.html"> Table of contents</a></h2>
+     <div>
+  <ul>
+    <li>
+      <a href="part0001.html#UGI0-b6aea6b975744e46b4d1346849966264">版权信息</a>
+    </li>
+    <li>
+      <a href="part0002.html#1T140-b6aea6b975744e46b4d1346849966264">内容提要</a>
+    </li>
+    <li>
+      <a href="part0003_split_000.html#2RHM0-b6aea6b975744e46b4d1346849966264">前言</a>
+    </li>
+    <li>
+      <a href="part0004_split_000.html#3Q280-b6aea6b975744e46b4d1346849966264">第1章 Kafka简介</a>
+      <ul>
+        <li>
+          <a href="part0004_split_001.html">1.1 Kafka背景</a>
+        </li>
+        <li>
+          <a href="part0004_split_002.html">1.2 Kafka基本结构</a>
+        </li>
+        <li>
+          <a href="part0004_split_003.html">1.3 Kafka基本概念</a>
+        </li>
+        <li>
+          <a href="part0004_split_004.html">1.4 Kafka设计概述</a>
+          <ul>
+            <li>
+              <a href="part0004_split_004.html#nav_point_13">1.4.1 Kafka设计动机</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_14">1.4.2 Kafka特性</a>
+            </li>
+            <li>
+              <a href="part0004_split_004.html#nav_point_15">1.4.3 Kafka应用场景</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0004_split_005.html">1.5 本书导读</a>
+        </li>
+        <li>
+          <a href="part0004_split_006.html">1.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0005_split_000.html#4OIQ0-b6aea6b975744e46b4d1346849966264">第2章 Kafka安装配置</a>
+      <ul>
+        <li>
+          <a href="part0005_split_001.html">2.1 基础环境配置</a>
+          <ul>
+            <li>
+              <a href="part0005_split_001.html#nav_point_20">2.1.1 JDK安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_21">2.1.2 SSH安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_001.html#nav_point_22">2.1.3 ZooKeeper环境</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_002.html">2.2 Kafka单机环境部署</a>
+          <ul>
+            <li>
+              <a href="part0005_split_002.html#nav_point_24">2.2.1 Windows环境安装Kafka</a>
+            </li>
+            <li>
+              <a href="part0005_split_002.html#nav_point_25">2.2.2 Linux环境安装Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_003.html">2.3 Kafka伪分布式环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_004.html">2.4 Kafka集群环境部署</a>
+        </li>
+        <li>
+          <a href="part0005_split_005.html">2.5 Kafka Manager安装</a>
+        </li>
+        <li>
+          <a href="part0005_split_006.html">2.6 Kafka源码编译</a>
+          <ul>
+            <li>
+              <a href="part0005_split_006.html#nav_point_30">2.6.1 Scala安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_31">2.6.2 Gradle安装配置</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_32">2.6.3 Kafka源码编译</a>
+            </li>
+            <li>
+              <a href="part0005_split_006.html#nav_point_33">2.6.4 Kafka导入Eclipse</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0005_split_007.html">2.7 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0006_split_000.html#5N3C0-b6aea6b975744e46b4d1346849966264">第3章 Kafka核心组件</a>
+      <ul>
+        <li>
+          <a href="part0006_split_001.html">3.1 延迟操作组件</a>
+          <ul>
+            <li>
+              <a href="part0006_split_001.html#nav_point_37">3.1.1 DelayedOperation</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_38">3.1.2 DelayedOperationPurgatory</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_39">3.1.3 DelayedProduce</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_40">3.1.4 DelayedFetch</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_41">3.1.5 DelayedJoin</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_42">3.1.6 DelayedHeartbeat</a>
+            </li>
+            <li>
+              <a href="part0006_split_001.html#nav_point_43">3.1.7 DelayedCreateTopics</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_002.html">3.2 控制器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_002.html#nav_point_45">3.2.1 控制器初始化</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_46">3.2.2 控制器选举过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_47">3.2.3 故障转移</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_48">3.2.4 代理上线与下线</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_49">3.2.5 主题管理</a>
+            </li>
+            <li>
+              <a href="part0006_split_002.html#nav_point_50">3.2.6 分区管理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_003.html">3.3 协调器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_003.html#nav_point_52">3.3.1 消费者协调器</a>
+            </li>
+            <li>
+              <a href="part0006_split_003.html#nav_point_53">3.3.2 组协调器</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_004.html">3.4 网络通信服务</a>
+          <ul>
+            <li>
+              <a href="part0006_split_004.html#nav_point_55">3.4.1 Acceptor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_56">3.4.2 Processor</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_57">3.4.3 RequestChannel</a>
+            </li>
+            <li>
+              <a href="part0006_split_004.html#nav_point_58">3.4.4 SocketServer启动过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_005.html">3.5 日志管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_005.html#nav_point_60">3.5.1 Kafka日志结构</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_61">3.5.2 日志管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_62">3.5.3 日志加载及恢复</a>
+            </li>
+            <li>
+              <a href="part0006_split_005.html#nav_point_63">3.5.4 日志清理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_006.html">3.6 副本管理器</a>
+          <ul>
+            <li>
+              <a href="part0006_split_006.html#nav_point_65">3.6.1 分区</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_66">3.6.2 副本</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_67">3.6.3 副本管理器启动过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_68">3.6.4 副本过期检查</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_69">3.6.5 追加消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_70">3.6.6 拉取消息</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_71">3.6.7 副本同步过程</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_72">3.6.8 副本角色转换</a>
+            </li>
+            <li>
+              <a href="part0006_split_006.html#nav_point_73">3.6.9 关闭副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0006_split_007.html">3.7 Handler</a>
+        </li>
+        <li>
+          <a href="part0006_split_008.html">3.8 动态配置管理器</a>
+        </li>
+        <li>
+          <a href="part0006_split_009.html">3.9 代理健康检测</a>
+        </li>
+        <li>
+          <a href="part0006_split_010.html">3.10 Kafka内部监控</a>
+        </li>
+        <li>
+          <a href="part0006_split_011.html">3.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0007_split_000.html#6LJU0-b6aea6b975744e46b4d1346849966264">第4章 Kafka核心流程分析</a>
+      <ul>
+        <li>
+          <a href="part0007_split_001.html">4.1 KafkaServer启动流程分析</a>
+        </li>
+        <li>
+          <a href="part0007_split_002.html">4.2 创建主题流程分析</a>
+          <ul>
+            <li>
+              <a href="part0007_split_002.html#nav_point_82">4.2.1 客户端创建主题</a>
+            </li>
+            <li>
+              <a href="part0007_split_002.html#nav_point_83">4.2.2 分区副本分配</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_003.html">4.3 生产者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_003.html#nav_point_85">4.3.1 Eclipse运行生产者源码</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_86">4.3.2 生产者重要配置说明</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_87">4.3.3 OldProducer执行流程</a>
+            </li>
+            <li>
+              <a href="part0007_split_003.html#nav_point_88">4.3.4 KafkaProducer实现原理</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_004.html">4.4 消费者</a>
+          <ul>
+            <li>
+              <a href="part0007_split_004.html#nav_point_90">4.4.1 旧版消费者</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_91">4.4.2 KafkaConsumer初始化</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_92">4.4.3 消费订阅</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_93">4.4.4 消费消息</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_94">4.4.5 消费偏移量提交</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_95">4.4.6 心跳探测</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_96">4.4.7 分区数与消费者线程的关系</a>
+            </li>
+            <li>
+              <a href="part0007_split_004.html#nav_point_97">4.4.8 消费者平衡过程</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0007_split_005.html">4.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0008_split_000.html#7K4G0-b6aea6b975744e46b4d1346849966264">第5章 Kafka基本操作实战</a>
+      <ul>
+        <li>
+          <a href="part0008_split_001.html">5.1 KafkaServer管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_001.html#nav_point_101">5.1.1 启动Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_102">5.1.2 启动Kafka集群</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_103">5.1.3 关闭Kafka单个节点</a>
+            </li>
+            <li>
+              <a href="part0008_split_001.html#nav_point_104">5.1.4 关闭Kafka集群</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_002.html">5.2 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_002.html#nav_point_106">5.2.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_107">5.2.2 删除主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_108">5.2.3 查看主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_002.html#nav_point_109">5.2.4 修改主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_003.html">5.3 生产者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_003.html#nav_point_111">5.3.1 启动生产者</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_112">5.3.2 创建主题</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_113">5.3.3 查看消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_003.html#nav_point_114">5.3.4 生产者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_004.html">5.4 消费者基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_004.html#nav_point_116">5.4.1 消费消息</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_117">5.4.2 单播与多播</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_118">5.4.3 查看消费偏移量</a>
+            </li>
+            <li>
+              <a href="part0008_split_004.html#nav_point_119">5.4.4 消费者性能测试工具</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_005.html">5.5 配置管理</a>
+          <ul>
+            <li>
+              <a href="part0008_split_005.html#nav_point_121">5.5.1 主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_122">5.5.2 代理级别设置</a>
+            </li>
+            <li>
+              <a href="part0008_split_005.html#nav_point_123">5.5.3 客户端/用户级别配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_006.html">5.6 分区操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_006.html#nav_point_125">5.6.1 分区Leader平衡</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_126">5.6.2 分区迁移</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_127">5.6.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0008_split_006.html#nav_point_128">5.6.4 增加副本</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_007.html">5.7 连接器基本操作</a>
+          <ul>
+            <li>
+              <a href="part0008_split_007.html#nav_point_130">5.7.1 独立模式</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_131">5.7.2 REST风格API应用</a>
+            </li>
+            <li>
+              <a href="part0008_split_007.html#nav_point_132">5.7.3 分布式模式</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_008.html">5.8 Kafka Manager应用</a>
+        </li>
+        <li>
+          <a href="part0008_split_009.html">5.9 Kafka安全机制</a>
+          <ul>
+            <li>
+              <a href="part0008_split_009.html#nav_point_135">5.9.1 利用SASL/PLAIN进行身份认证</a>
+            </li>
+            <li>
+              <a href="part0008_split_009.html#nav_point_136">5.9.2 权限控制</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0008_split_010.html">5.10 镜像操作</a>
+        </li>
+        <li>
+          <a href="part0008_split_011.html">5.11 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0009_split_000.html#8IL20-b6aea6b975744e46b4d1346849966264">第6章 Kafka API编程实战</a>
+      <ul>
+        <li>
+          <a href="part0009_split_001.html">6.1 主题管理</a>
+          <ul>
+            <li>
+              <a href="part0009_split_001.html#nav_point_141">6.1.1 创建主题</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_142">6.1.2 修改主题级别配置</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_143">6.1.3 增加分区</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_144">6.1.4 分区副本重分配</a>
+            </li>
+            <li>
+              <a href="part0009_split_001.html#nav_point_145">6.1.5 删除主题</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_002.html">6.2 生产者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_002.html#nav_point_147">6.2.1 单线程生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_002.html#nav_point_148">6.2.2 多线程生产者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_003.html">6.3 消费者API应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_003.html#nav_point_150">6.3.1 旧版消费者API应用</a>
+            </li>
+            <li>
+              <a href="part0009_split_003.html#nav_point_151">6.3.2 新版消费者API应用</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_004.html">6.4 自定义组件实现</a>
+          <ul>
+            <li>
+              <a href="part0009_split_004.html#nav_point_153">6.4.1 分区器</a>
+            </li>
+            <li>
+              <a href="part0009_split_004.html#nav_point_154">6.4.2 序列化与反序列化</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_005.html">6.5 Spring与Kafka整合应用</a>
+          <ul>
+            <li>
+              <a href="part0009_split_005.html#nav_point_156">6.5.1 生产者</a>
+            </li>
+            <li>
+              <a href="part0009_split_005.html#nav_point_157">6.5.2 消费者</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0009_split_006.html">6.6 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0010_split_000.html#9H5K0-b6aea6b975744e46b4d1346849966264">第7章 Kafka Streams</a>
+      <ul>
+        <li>
+          <a href="part0010_split_001.html">7.1 Kafka Streams简介</a>
+        </li>
+        <li>
+          <a href="part0010_split_002.html">7.2 Kafka Streams基本概念</a>
+          <ul>
+            <li>
+              <a href="part0010_split_002.html#nav_point_162">7.2.1 流</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_163">7.2.2 流处理器</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_164">7.2.3 处理器拓扑</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_165">7.2.4 时间</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_166">7.2.5 状态</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_167">7.2.6 KStream和KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_002.html#nav_point_168">7.2.7 窗口</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_003.html">7.3 Kafka Streams API介绍</a>
+          <ul>
+            <li>
+              <a href="part0010_split_003.html#nav_point_170">7.3.1 KStream与KTable</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_171">7.3.2 窗口操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_172">7.3.3 连接操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_173">7.3.4 变换操作</a>
+            </li>
+            <li>
+              <a href="part0010_split_003.html#nav_point_174">7.3.5 聚合操作</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_004.html">7.4 接口恶意访问自动检测</a>
+          <ul>
+            <li>
+              <a href="part0010_split_004.html#nav_point_176">7.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0010_split_004.html#nav_point_177">7.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0010_split_005.html">7.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0011_split_000.html#AFM60-b6aea6b975744e46b4d1346849966264">第8章 Kafka数据采集应用</a>
+      <ul>
+        <li>
+          <a href="part0011_split_001.html">8.1 Log4j集成Kafka应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_001.html#nav_point_181">8.1.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0011_split_001.html#nav_point_182">8.1.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_002.html">8.2 Kafka与Flume整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_002.html#nav_point_184">8.2.1 Flume简介</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_185">8.2.2 Flume与Kafka比较</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_186">8.2.3 Flume的安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_002.html#nav_point_187">8.2.4 Flume采集日志写入Kafka</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_003.html">8.3 Kafka与Flume和HDFS整合应用</a>
+          <ul>
+            <li>
+              <a href="part0011_split_003.html#nav_point_189">8.3.1 Hadoop安装配置</a>
+            </li>
+            <li>
+              <a href="part0011_split_003.html#nav_point_190">8.3.2 Flume采集Kafka消息写入HDFS</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0011_split_004.html">8.4 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0012_split_000.html#BE6O0-b6aea6b975744e46b4d1346849966264">第9章 Kafka与ELK整合应用</a>
+      <ul>
+        <li>
+          <a href="part0012_split_001.html">9.1 ELK环境搭建</a>
+          <ul>
+            <li>
+              <a href="part0012_split_001.html#nav_point_194">9.1.1 Elasticsearch安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_195">9.1.2 Logstash安装配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_001.html#nav_point_196">9.1.3 Kibana安装配置</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_002.html">9.2 Kafka与Logstash整合</a>
+          <ul>
+            <li>
+              <a href="part0012_split_002.html#nav_point_198">9.2.1 Logstash收集日志到Kafka</a>
+            </li>
+            <li>
+              <a href="part0012_split_002.html#nav_point_199">9.2.2 Logstash从Kafka消费日志</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_003.html">9.3 日志采集分析系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_003.html#nav_point_201">9.3.1 Flume采集日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_202">9.3.2 Logstash拉取日志配置</a>
+            </li>
+            <li>
+              <a href="part0012_split_003.html#nav_point_203">9.3.3 Kibana日志展示</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_004.html">9.4 服务器性能监控系统</a>
+          <ul>
+            <li>
+              <a href="part0012_split_004.html#nav_point_205">9.4.1 Metricbeat安装</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_206">9.4.2 采集信息存储到Elasticsearch</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_207">9.4.3 加载beats-dashboards</a>
+            </li>
+            <li>
+              <a href="part0012_split_004.html#nav_point_208">9.4.4 服务器性能监控系统具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0012_split_005.html">9.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0013_split_000.html#CCNA0-b6aea6b975744e46b4d1346849966264">第10章 Kafka与Spark整合应用</a>
+      <ul>
+        <li>
+          <a href="part0013_split_001.html">10.1 Spark简介</a>
+        </li>
+        <li>
+          <a href="part0013_split_002.html">10.2 Spark基本操作</a>
+          <ul>
+            <li>
+              <a href="part0013_split_002.html#nav_point_213">10.2.1 Spark安装</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_214">10.2.2 Spark shell应用</a>
+            </li>
+            <li>
+              <a href="part0013_split_002.html#nav_point_215">10.2.3 spark-submit提交作业</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_003.html">10.3 Spark在智能投顾领域应用</a>
+          <ul>
+            <li>
+              <a href="part0013_split_003.html#nav_point_217">10.3.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_003.html#nav_point_218">10.3.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_004.html">10.4 热搜词统计</a>
+          <ul>
+            <li>
+              <a href="part0013_split_004.html#nav_point_220">10.4.1 应用描述</a>
+            </li>
+            <li>
+              <a href="part0013_split_004.html#nav_point_221">10.4.2 具体实现</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a href="part0013_split_005.html">10.5 小结</a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a href="part0014_split_000.html#DB7S0-b6aea6b975744e46b4d1346849966264">欢迎来到异步社区！</a>
+    </li>
+  </ul>
+</div>
+
+
+  </div>
+  
+
+  <div class="calibreEbNav">
+    
+      <a href="part0009_split_002.html" class="calibreAPrev">previous page</a>
+    
+
+    <a href="../../jhnii3.html" class="calibreAHome"> start</a>
+
+    
+      <a href="part0009_split_004.html" class="calibreANext"> next page</a>
+    
+  </div>
+
+</div>
+
+</body>
+</html>
